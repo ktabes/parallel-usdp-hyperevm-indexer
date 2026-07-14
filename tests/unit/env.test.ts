@@ -39,4 +39,30 @@ describe("parseRuntimeEnv", () => {
       parseRuntimeEnv({ ...validEnvironment, HYPEREVM_RPC_URL: "not-a-url" }),
     ).toThrow(/HYPEREVM_RPC_URL/);
   });
+
+  it("accepts an optional Alchemy key without exposing it in a URL", () => {
+    expect(
+      parseRuntimeEnv({
+        ...validEnvironment,
+        ALCHEMY_API_KEY: "test-key-value",
+      }).ALCHEMY_API_KEY,
+    ).toBe("test-key-value");
+    expect(
+      parseRuntimeEnv({ ...validEnvironment, ALCHEMY_API_KEY: "" })
+        .ALCHEMY_API_KEY,
+    ).toBeUndefined();
+  });
+
+  it("accepts an optional OnFinality key", () => {
+    expect(
+      parseRuntimeEnv({
+        ...validEnvironment,
+        ONFINALITY_API_KEY: "archive-key-value",
+      }).ONFINALITY_API_KEY,
+    ).toBe("archive-key-value");
+    expect(
+      parseRuntimeEnv({ ...validEnvironment, ONFINALITY_API_KEY: "" })
+        .ONFINALITY_API_KEY,
+    ).toBeUndefined();
+  });
 });

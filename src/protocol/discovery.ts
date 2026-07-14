@@ -30,6 +30,11 @@ export interface DiscoveryOptions {
   rpcUrl: string;
   block: DiscoveryBlock;
   finalityLag: number;
+  minRequestIntervalMs?: number;
+  providerName?: string;
+  historicalRpcUrl?: string;
+  historicalProviderName?: string;
+  historicalMinRequestIntervalMs?: number;
 }
 
 interface Check {
@@ -146,7 +151,14 @@ async function discoverPriceFeed(
 }
 
 export async function discoverProtocol(options: DiscoveryOptions) {
-  const client = createHyperevmClient(options.rpcUrl);
+  const client = createHyperevmClient(options.rpcUrl, {
+    minRequestIntervalMs: options.minRequestIntervalMs,
+  });
+  const historicalClient = options.historicalRpcUrl
+    ? createHyperevmClient(options.historicalRpcUrl, {
+        minRequestIntervalMs: options.historicalMinRequestIntervalMs,
+      })
+    : client;
   const chainId = await client.getChainId();
   const head = await client.getBlockNumber();
   const finalizedCandidate = head - BigInt(options.finalityLag);
@@ -246,7 +258,7 @@ export async function discoverProtocol(options: DiscoveryOptions) {
     read(parallelizer.address, parallelizerAbi, "getTotalIssued"),
     read(parallelizer.address, parallelizerAbi, "getCollateralRatio"),
     read(parallelizer.address, parallelizerAbi, "facetAddresses"),
-    historicalStateProbe(client),
+    historicalStateProbe(historicalClient),
     discoverPriceFeed(client, usdpUsd.address, callBlockNumber),
     discoverPriceFeed(client, susdpUsd.address, callBlockNumber),
   ]);
@@ -391,18 +403,41 @@ export async function discoverProtocol(options: DiscoveryOptions) {
     actual: historyProbe.honored,
     note: historyProbe.note,
   });
+  const primaryProviderVerifiedForPinnedReads =
+    options.block === "latest" ||
+    !options.historicalRpcUrl ||
+    options.historicalRpcUrl === options.rpcUrl;
+  if (options.block !== "latest") {
+    checks.push({
+      name: "pinned-read-provider-verified",
+      status: primaryProviderVerifiedForPinnedReads ? "pass" : "warn",
+      actual: primaryProviderVerifiedForPinnedReads,
+      note: primaryProviderVerifiedForPinnedReads
+        ? "The primary read provider also passed the deployment-block historical-state probe."
+        : "The historical-state probe used a different provider, so the primary provider is not proven to honor pinned eth_call state.",
+    });
+  }
 
   const actualBalance = BigInt(actualVaultBalance as bigint);
   const pendingYield = calculatePendingYield(totalAssets, actualBalance);
   const failedChecks = checks.filter((check) => check.status === "fail");
+  const warningChecks = checks.filter((check) => check.status === "warn");
 
   return stringify({
     schemaVersion: 1,
     manifestVersion: hyperevmProtocol.manifestVersion,
-    status: failedChecks.length === 0 ? "candidate" : "invalid",
+    status:
+      failedChecks.length > 0
+        ? "invalid"
+        : warningChecks.length > 0
+          ? "candidate"
+          : "verified",
     generatedAt: new Date().toISOString(),
     source: hyperevmProtocol.officialSources,
     rpc: {
+      provider: options.providerName ?? "configured",
+      historicalProbeProvider:
+        options.historicalProviderName ?? options.providerName ?? "configured",
       chainId,
       head,
       finalityLag: options.finalityLag,
@@ -411,9 +446,9 @@ export async function discoverProtocol(options: DiscoveryOptions) {
       readConsistency:
         callBlockNumber === undefined
           ? "latest-unpinned"
-          : historyProbe.honored
+          : historyProbe.honored && primaryProviderVerifiedForPinnedReads
             ? "pinned"
-            : "provider-ignored-historical-block",
+            : "pinned-requested-primary-provider-unverified",
       historicalStateProbe: historyProbe,
     },
     referenceBlock: {

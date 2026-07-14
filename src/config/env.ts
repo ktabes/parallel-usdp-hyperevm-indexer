@@ -7,6 +7,12 @@ const integerFromString = (name: string, minimum: number, maximum: number) =>
     .min(minimum, `${name} must be at least ${minimum}`)
     .max(maximum, `${name} must be at most ${maximum}`);
 
+const optionalSecret = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() === "" ? undefined : value,
+  z.string().min(1).optional(),
+);
+
 export const runtimeEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -15,6 +21,8 @@ export const runtimeEnvSchema = z.object({
     .string()
     .regex(/^postgres(?:ql)?:\/\//, "DATABASE_URL must be a PostgreSQL URL"),
   HYPEREVM_RPC_URL: z.url("HYPEREVM_RPC_URL must be a valid URL"),
+  ALCHEMY_API_KEY: optionalSecret,
+  ONFINALITY_API_KEY: optionalSecret,
   FINALITY_LAG: integerFromString("FINALITY_LAG", 1, 10_000).default(5),
   RPC_LOG_CHUNK_SIZE: integerFromString(
     "RPC_LOG_CHUNK_SIZE",
@@ -35,6 +43,8 @@ export type RuntimeEnv = z.infer<typeof runtimeEnvSchema>;
 
 export const discoveryEnvSchema = runtimeEnvSchema.pick({
   HYPEREVM_RPC_URL: true,
+  ALCHEMY_API_KEY: true,
+  ONFINALITY_API_KEY: true,
   FINALITY_LAG: true,
   RPC_LOG_CHUNK_SIZE: true,
 });

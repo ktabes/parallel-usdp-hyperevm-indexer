@@ -66,6 +66,6 @@
   ],
   "approval": {
     "approved": false,
-    "blocker": "The official public RPC does not honor historical eth_call state. Re-run discovery with an archive-capable endpoint at a pinned finalized block before approval."
+    "blocker": "Alchemy and the official public RPC do not prove historical eth_call state. Repeat full pinned discovery with an authenticated OnFinality archive endpoint before approval."
   }
 }

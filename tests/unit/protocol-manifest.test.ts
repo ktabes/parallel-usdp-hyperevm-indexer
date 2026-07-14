@@ -60,6 +60,6 @@ describe("HyperEVM Parallel candidate manifest", () => {
     ) as { status: string; approval: { approved: boolean; blocker: string } };
     expect(manifest.status).toBe("candidate");
     expect(manifest.approval.approved).toBe(false);
-    expect(manifest.approval.blocker).toMatch(/historical eth_call/);
+    expect(manifest.approval.blocker).toMatch(/OnFinality archive/);
   });
 });
