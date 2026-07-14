@@ -1,5 +1,6 @@
 import { parseRuntimeEnv } from "@/config/env";
 import { createDatabase } from "@/db/client";
+import { HYPEREVM_CHAIN_ID } from "@/protocol/hyperevm";
 import {
   DEFAULT_INDEXER_SCOPE,
   ingestLogs,
@@ -7,6 +8,11 @@ import {
 } from "./service";
 
 const WORKER_LOCK_ID = 999_700_001;
+const LOCK_RETRY_INTERVAL_MS = 15_000;
+const LOCK_RETRY_ATTEMPTS = 20;
+
+const wait = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 
 export async function runSevenDayWorker() {
   const env = parseRuntimeEnv(process.env);
@@ -20,14 +26,37 @@ export async function runSevenDayWorker() {
   process.once("SIGTERM", interrupt);
 
   try {
-    const lock = await lockClient.query<{ acquired: boolean }>(
-      "select pg_try_advisory_lock($1) as acquired",
-      [WORKER_LOCK_ID],
-    );
-    if (!lock.rows[0]?.acquired) {
-      console.log("Seven-day backfill worker skipped: lock already held.");
+    let acquired = false;
+    for (let attempt = 1; attempt <= LOCK_RETRY_ATTEMPTS; attempt += 1) {
+      const lock = await lockClient.query<{ acquired: boolean }>(
+        "select pg_try_advisory_lock($1) as acquired",
+        [WORKER_LOCK_ID],
+      );
+      acquired = Boolean(lock.rows[0]?.acquired);
+      if (acquired) break;
+      console.log(
+        `Seven-day backfill lock held; retry ${attempt}/${LOCK_RETRY_ATTEMPTS}.`,
+      );
+      if (attempt < LOCK_RETRY_ATTEMPTS) await wait(LOCK_RETRY_INTERVAL_MS);
+    }
+    if (!acquired) {
+      console.log("Seven-day backfill worker stopped: lock remained held.");
       return { status: "already-running" } as const;
     }
+    await pool.query(
+      `update indexer_runs set
+         status = 'interrupted',
+         finished_at = now(),
+         failure = $2::jsonb
+       where chain_id = $1 and status = 'running'`,
+      [
+        HYPEREVM_CHAIN_ID,
+        JSON.stringify({
+          message:
+            "Previous worker stopped before recording a terminal state; resumed from checkpoint.",
+        }),
+      ],
+    );
     const range = await resolveSevenDayRange(
       env.HYPEREVM_RPC_URL,
       env.FINALITY_LAG,
