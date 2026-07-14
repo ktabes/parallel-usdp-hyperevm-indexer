@@ -30,7 +30,7 @@ jobs:
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/parallel_usdp_test
       HYPEREVM_RPC_URL: https://rpc.example.invalid
       FINALITY_LAG: 5
-      RPC_LOG_CHUNK_SIZE: 5000
+      RPC_LOG_CHUNK_SIZE: 50
       PRICE_SOURCE: unconfigured
       REFRESH_INTERVAL_SECONDS: 30
       RUN_NETWORK_TESTS: 0

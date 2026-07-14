@@ -1,7 +1,14 @@
-import { parseRuntimeEnv } from "@/config/env";
+import { parseDiscoveryEnv, parseRuntimeEnv } from "@/config/env";
 import { createDatabase } from "@/db/client";
+import { discoverProtocol } from "@/protocol/discovery";
+import { runPublicRpcPreflight } from "@/protocol/preflight";
 
 const command = process.argv[2];
+
+function argument(name: string) {
+  const index = process.argv.indexOf(name);
+  return index === -1 ? undefined : process.argv[index + 1];
+}
 
 async function configCheck() {
   const env = parseRuntimeEnv(process.env);
@@ -39,6 +46,28 @@ async function databasePing() {
   }
 }
 
+async function discover() {
+  const env = parseDiscoveryEnv(process.env);
+  const blockArgument = argument("--block") ?? "latest";
+  const block = blockArgument === "latest" ? "latest" : BigInt(blockArgument);
+  const result = await discoverProtocol({
+    rpcUrl: env.HYPEREVM_RPC_URL,
+    finalityLag: env.FINALITY_LAG,
+    block,
+  });
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function preflight() {
+  const env = parseDiscoveryEnv(process.env);
+  const result = await runPublicRpcPreflight({
+    rpcUrl: env.HYPEREVM_RPC_URL,
+    finalityLag: env.FINALITY_LAG,
+    chunkSize: env.RPC_LOG_CHUNK_SIZE,
+  });
+  console.log(JSON.stringify(result, null, 2));
+}
+
 async function main() {
   switch (command) {
     case "config-check":
@@ -47,8 +76,16 @@ async function main() {
     case "db-ping":
       await databasePing();
       return;
+    case "discover":
+      await discover();
+      return;
+    case "preflight":
+      await preflight();
+      return;
     default:
-      throw new Error("Usage: npm run cli -- <config-check|db-ping>");
+      throw new Error(
+        "Usage: npm run cli -- <config-check|db-ping|discover|preflight> [--block latest|NUMBER]",
+      );
   }
 }
 

@@ -1,8 +1,8 @@
-const phaseZeroChecks = [
-  "Strict runtime configuration",
-  "Versioned PostgreSQL migrations",
-  "Deterministic test lanes",
-  "Metric and evidence contracts",
+const phaseOneChecks = [
+  "Official deployment artifacts pinned",
+  "Live proxy, facet, and collateral relationships verified",
+  "Savings math and economic event ABIs executable",
+  "DIA USDp and sUSDp market feeds verified",
 ];
 
 export default function Home() {
@@ -16,15 +16,15 @@ export default function Home() {
           native Yield Paid Out.
         </p>
         <div className="status">
-          <span>Phase 0</span>
-          <strong>Foundation in progress</strong>
+          <span>Phase 1</span>
+          <strong>Discovery candidate</strong>
         </div>
       </section>
 
-      <section className="checks" aria-labelledby="foundation-heading">
-        <h2 id="foundation-heading">Foundation gate</h2>
+      <section className="checks" aria-labelledby="discovery-heading">
+        <h2 id="discovery-heading">Discovery gate</h2>
         <ul>
-          {phaseZeroChecks.map((check) => (
+          {phaseOneChecks.map((check) => (
             <li key={check}>{check}</li>
           ))}
         </ul>

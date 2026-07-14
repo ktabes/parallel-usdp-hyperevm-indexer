@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "calculationVersion": "parallel-usdp-metrics-v1-candidate",
+  "status": "candidate",
+  "chainId": 999,
+  "timestampConvention": "source block timestamp in UTC",
+  "finalityRule": "block_number <= observed_head - configured_finality_lag",
+  "numericPolicy": "integer base units only; decimal formatting at presentation boundaries",
+  "metrics": [
+    {
+      "id": "usdp_total_supply",
+      "unit": "usdp_base_units",
+      "source": "USDp.totalSupply()",
+      "formula": "direct pinned-block contract read",
+      "required": true
+    },
+    {
+      "id": "usdp_market_value_usd",
+      "unit": "usd_atomic",
+      "source": "usdp_total_supply and timestamped USDp price observation",
+      "formula": "usdp_total_supply * usdp_price_usd",
+      "required": true,
+      "unavailableWhen": "price source is absent or stale"
+    },
+    {
+      "id": "susdp_total_assets_usdp",
+      "unit": "usdp_base_units",
+      "source": "sUSDp.totalAssets()",
+      "formula": "direct pinned-block contract read",
+      "required": true
+    },
+    {
+      "id": "susdp_actual_assets_usdp",
+      "unit": "usdp_base_units",
+      "source": "USDp.balanceOf(sUSDp)",
+      "formula": "direct pinned-block contract read",
+      "required": true
+    },
+    {
+      "id": "susdp_pending_yield_usdp",
+      "unit": "usdp_base_units",
+      "source": "sUSDp.totalAssets() and USDp.balanceOf(sUSDp)",
+      "formula": "susdp_total_assets_usdp - susdp_actual_assets_usdp",
+      "required": true,
+      "invalidWhen": "result is negative"
+    },
+    {
+      "id": "susdp_native_ypo_usdp",
+      "unit": "usdp_base_units",
+      "source": "Savings.Accrued and pending-yield boundary reads",
+      "formula": "sum(accrued_interest in (start,end]) + pending_yield(end) - pending_yield(start)",
+      "required": true,
+      "windowConvention": "(start_block,end_block]"
+    },
+    {
+      "id": "susdp_tvl_usd",
+      "unit": "usd_atomic",
+      "source": "susdp_total_assets_usdp and timestamped USDp price observation",
+      "formula": "susdp_total_assets_usdp * usdp_price_usd",
+      "required": true
+    },
+    {
+      "id": "susdp_share_price_usdp",
+      "unit": "usdp_per_share_atomic",
+      "source": "sUSDp.convertToAssets(10^sUSDp_decimals)",
+      "formula": "direct pinned-block contract read",
+      "required": true
+    },
+    {
+      "id": "susdp_estimated_apr",
+      "unit": "fixed_18",
+      "source": "sUSDp.estimatedAPR()",
+      "formula": "contract Savings._computeUpdatedAssets(BASE_18,31536000)-BASE_18",
+      "required": true,
+      "label": "estimated APR"
+    },
+    {
+      "id": "susdp_realized_trailing_apy",
+      "unit": "fixed_18",
+      "source": "reconciled share-price snapshots",
+      "formula": "annualized exact share-price return over the selected trailing window",
+      "required": true,
+      "unavailableWhen": "the full selected window has not been indexed and reconciled"
+    },
+    {
+      "id": "usdp_issued",
+      "unit": "usdp_base_units",
+      "source": "Parallelizer Swap emitted at the diamond address",
+      "formula": "sum(amountOut) where tokenOut is USDp",
+      "required": true
+    },
+    {
+      "id": "usdp_burned_for_collateral",
+      "unit": "usdp_base_units",
+      "source": "Parallelizer Swap emitted at the diamond address",
+      "formula": "sum(amountIn) where tokenIn is USDp",
+      "required": true
+    },
+    {
+      "id": "usdp_redeemed",
+      "unit": "usdp_base_units",
+      "source": "Parallelizer Redeemed emitted at the diamond address",
+      "formula": "sum(amount)",
+      "required": true
+    },
+    {
+      "id": "susdp_deposited",
+      "unit": "usdp_base_units",
+      "source": "sUSDp Deposit.assets",
+      "formula": "sum(assets)",
+      "required": true
+    },
+    {
+      "id": "susdp_withdrawn",
+      "unit": "usdp_base_units",
+      "source": "sUSDp Withdraw.assets",
+      "formula": "sum(assets)",
+      "required": true
+    },
+    {
+      "id": "active_susdp_holders",
+      "unit": "address_count",
+      "source": "complete sUSDp Transfer replay",
+      "formula": "count positive balances excluding zero and documented system addresses",
+      "required": false,
+      "unavailableWhen": "transfer history is incomplete"
+    }
+  ],
+  "nonApplicableMetrics": [
+    "native_borrowers",
+    "native_borrows",
+    "native_repays",
+    "native_liquidations"
+  ]
+}

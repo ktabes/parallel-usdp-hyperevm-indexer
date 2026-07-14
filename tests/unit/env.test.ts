@@ -6,7 +6,7 @@ const validEnvironment = {
   DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/indexer_test",
   HYPEREVM_RPC_URL: "https://rpc.example.invalid",
   FINALITY_LAG: "5",
-  RPC_LOG_CHUNK_SIZE: "5000",
+  RPC_LOG_CHUNK_SIZE: "50",
   PRICE_SOURCE: "unconfigured",
   REFRESH_INTERVAL_SECONDS: "30",
 };
@@ -16,7 +16,7 @@ describe("parseRuntimeEnv", () => {
     expect(parseRuntimeEnv(validEnvironment)).toMatchObject({
       NODE_ENV: "test",
       FINALITY_LAG: 5,
-      RPC_LOG_CHUNK_SIZE: 5_000,
+      RPC_LOG_CHUNK_SIZE: 50,
       PRICE_SOURCE: "unconfigured",
       REFRESH_INTERVAL_SECONDS: 30,
     });

@@ -4,7 +4,7 @@ An independent, auditable indexer and analytics surface for Parallel V3 USDp and
 
 ## Current status
 
-Phase 0 foundation. Protocol addresses in planning material are candidates until Phase 1 verifies their bytecode, proxy implementations, relationships, ABI provenance, start blocks, and event behavior at a pinned finalized HyperEVM block.
+Phase 1 candidate. Official deployment artifacts, contract identities, proxy implementations, Parallelizer facets and collateral relationships, ABI provenance, deployment blocks, metric definitions, and DIA price feeds are executable and verified against current HyperEVM state. Approval remains gated on repeating state discovery at a pinned finalized block through an archive-capable RPC.
 
 ## Product boundary
 
@@ -32,6 +32,8 @@ Useful commands:
 ```bash
 npm run cli -- config-check
 npm run cli -- db-ping
+npm run cli -- discover --block latest
+npm run cli -- preflight
 npm run test:unit
 npm run test:fixtures
 npm run test:integration
@@ -39,6 +41,8 @@ npm run test:network
 ```
 
 Network tests are opt-in and require `RUN_NETWORK_TESTS=1` plus a real `HYPEREVM_RPC_URL`. Integration tests run when `TEST_DATABASE_URL` is present and otherwise report as skipped.
+
+The official HyperEVM RPC can be used for current-state discovery and small bounded log samples, but it does not honor historical `eth_call` state and limits `eth_getLogs` to 50-block ranges. A manifest produced from it remains a candidate until the same discovery passes against a pinned finalized block through an archive-capable endpoint; a complete seven-day or lifetime backfill also needs a higher-capacity endpoint.
 
 ## Phase gates
 

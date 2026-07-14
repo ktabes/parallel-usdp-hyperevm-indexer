@@ -6,7 +6,8 @@ export function GET() {
   return NextResponse.json({
     status: "ok",
     service: "parallel-usdp-hyperevm-indexer",
-    phase: 0,
+    phase: 1,
+    phaseStatus: "candidate",
     timestamp: new Date().toISOString(),
   });
 }
