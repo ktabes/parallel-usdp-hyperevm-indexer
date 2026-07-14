@@ -426,21 +426,28 @@ export async function ingestLogs(
         plannedRanges.push(range);
         plannedFrom = range.toBlock + 1n;
       }
-      const fetchedBatch = await Promise.all(
-        plannedRanges.map((range) =>
-          fetchLogsWithPolicy(
-            client,
-            range.fromBlock,
-            range.toBlock,
-            activeChunkSize,
-            options.maxRetries ?? 5,
-            counters,
-          ),
-        ),
-      );
+      const fetchedBatch = plannedRanges.map(async (range) => {
+        try {
+          return {
+            ok: true as const,
+            value: await fetchLogsWithPolicy(
+              client,
+              range.fromBlock,
+              range.toBlock,
+              activeChunkSize,
+              options.maxRetries ?? 5,
+              counters,
+            ),
+          };
+        } catch (error) {
+          return { ok: false as const, error };
+        }
+      });
 
       for (let index = 0; index < fetchedBatch.length; index += 1) {
-        const fetched = fetchedBatch[index]!;
+        const fetchedResult = await fetchedBatch[index]!;
+        if (!fetchedResult.ok) throw fetchedResult.error;
+        const fetched = fetchedResult.value;
         const planned = plannedRanges[index]!;
         activeChunkSize = fetched.chunkSize;
         const blocksByNumber = new Map<bigint, StoredBlock>();
