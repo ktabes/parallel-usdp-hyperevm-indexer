@@ -16,6 +16,18 @@ describe("initial migration contract", () => {
     );
   });
 
+  it("adds idempotent coverage and one-to-one decoded event storage", async () => {
+    const migration = await readFile("drizzle/0001_bent_lilandra.sql", "utf8");
+    expect(migration).toContain('CREATE TABLE "indexer_coverage"');
+    expect(migration).toContain(
+      'CREATE UNIQUE INDEX "indexer_coverage_scope_range_unique"',
+    );
+    expect(migration).toContain('CREATE TABLE "protocol_events"');
+    expect(migration).toContain(
+      'CREATE UNIQUE INDEX "protocol_events_raw_log_unique"',
+    );
+  });
+
   it("keeps manifest status fail-closed", async () => {
     const migration = await readFile(
       "drizzle/0000_quiet_steve_rogers.sql",

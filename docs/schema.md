@@ -6,9 +6,11 @@ The Phase 0 migration establishes only the source and control plane that must re
 - `blocks` anchors every observation to finalized chain state.
 - `raw_logs` preserves immutable event evidence with the canonical uniqueness key.
 - `indexer_runs` and `indexer_checkpoints` make progress observable and restartable.
+- `indexer_coverage` proves exactly which inclusive ranges completed, including overlapping reruns.
 - `price_observations` keeps pricing attributed and separate from native protocol accounting.
+- `protocol_events` stores rebuildable decoded payloads linked one-to-one to their immutable raw logs.
 
-Normalized protocol events, transfer ledgers, vault/rate events, hourly flows, snapshots, YPO aggregates, reconciliation runs, and health findings are intentionally deferred until Phase 1 locks the executable event and metric contract. This avoids encoding unverified candidate semantics into the durable schema.
+Transfer ledgers, specialized vault/rate tables, hourly flows, snapshots, YPO aggregates, reconciliation runs, and health findings remain deferred to their later phase gates. The generic Phase 2 event table preserves decoded evidence without prematurely assigning final economic classifications.
 
 ## Rules
 

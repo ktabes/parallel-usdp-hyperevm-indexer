@@ -168,6 +168,70 @@ export const rawLogs = pgTable(
   ],
 );
 
+export const protocolEvents = pgTable(
+  "protocol_events",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    rawLogId: bigint("raw_log_id", { mode: "bigint" })
+      .notNull()
+      .references(() => rawLogs.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    blockNumber: bigint("block_number", { mode: "bigint" }).notNull(),
+    transactionHash: text("transaction_hash").notNull(),
+    logIndex: integer("log_index").notNull(),
+    contractRole: text("contract_role").notNull(),
+    eventName: text("event_name").notNull(),
+    payload: jsonb("payload").notNull(),
+    decoderVersion: text("decoder_version").notNull(),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("protocol_events_raw_log_unique").on(table.rawLogId),
+    index("protocol_events_chain_block_idx").on(
+      table.chainId,
+      table.blockNumber,
+    ),
+    index("protocol_events_name_block_idx").on(
+      table.eventName,
+      table.blockNumber,
+    ),
+  ],
+);
+
+export const indexerCoverage = pgTable(
+  "indexer_coverage",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    scope: text("scope").notNull(),
+    fromBlock: bigint("from_block", { mode: "bigint" }).notNull(),
+    toBlock: bigint("to_block", { mode: "bigint" }).notNull(),
+    runId: uuid("run_id").references(() => indexerRuns.id, {
+      onDelete: "set null",
+    }),
+    scannedAt: timestamp("scanned_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("indexer_coverage_scope_range_unique").on(
+      table.chainId,
+      table.scope,
+      table.fromBlock,
+      table.toBlock,
+    ),
+    index("indexer_coverage_scope_from_idx").on(
+      table.chainId,
+      table.scope,
+      table.fromBlock,
+    ),
+    check(
+      "indexer_coverage_range_check",
+      sql`${table.toBlock} >= ${table.fromBlock}`,
+    ),
+  ],
+);
+
 export const indexerCheckpoints = pgTable(
   "indexer_checkpoints",
   {

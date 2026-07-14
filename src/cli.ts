@@ -1,5 +1,12 @@
 import { parseDiscoveryEnv, parseRuntimeEnv } from "@/config/env";
 import { createDatabase } from "@/db/client";
+import {
+  DEFAULT_INDEXER_SCOPE,
+  ingestLogs,
+  resolveSevenDayRange,
+  type IngestionProgress,
+} from "@/indexer/service";
+import { indexerStatus, verifyCoverage } from "@/indexer/status";
 import { discoverProtocol } from "@/protocol/discovery";
 import { runPublicRpcPreflight } from "@/protocol/preflight";
 import {
@@ -13,6 +20,34 @@ const command = process.argv[2];
 function argument(name: string) {
   const index = process.argv.indexOf(name);
   return index === -1 ? undefined : process.argv[index + 1];
+}
+
+function requiredArgument(name: string) {
+  const value = argument(name);
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
+function indexerScope() {
+  return argument("--scope") ?? DEFAULT_INDEXER_SCOPE;
+}
+
+function progressReporter() {
+  let lastReportedChunk = -1;
+  return (progress: IngestionProgress) => {
+    const chunk = progress.counters.chunks;
+    if (
+      progress.status === "running" &&
+      chunk !== 1 &&
+      chunk % 100 !== 0 &&
+      chunk === lastReportedChunk
+    )
+      return;
+    if (progress.status === "running" && chunk % 100 !== 0 && chunk !== 1)
+      return;
+    lastReportedChunk = chunk;
+    console.log(JSON.stringify(progress));
+  };
 }
 
 async function configCheck() {
@@ -98,6 +133,120 @@ async function preflight() {
   console.log(JSON.stringify(result, null, 2));
 }
 
+async function runIngestion(fromBlock: bigint, toBlock: bigint) {
+  const env = parseRuntimeEnv(process.env);
+  const { pool } = createDatabase(env);
+  const controller = new AbortController();
+  const interrupt = () => controller.abort();
+  process.once("SIGINT", interrupt);
+  process.once("SIGTERM", interrupt);
+
+  try {
+    const result = await ingestLogs({
+      pool,
+      rpcUrl: env.HYPEREVM_RPC_URL,
+      fromBlock,
+      toBlock,
+      finalityLag: env.FINALITY_LAG,
+      chunkSize: env.RPC_LOG_CHUNK_SIZE,
+      scope: indexerScope(),
+      signal: controller.signal,
+      onProgress: progressReporter(),
+    });
+    console.log(JSON.stringify(result, null, 2));
+  } finally {
+    process.removeListener("SIGINT", interrupt);
+    process.removeListener("SIGTERM", interrupt);
+    await pool.end();
+  }
+}
+
+async function backfill() {
+  await runIngestion(
+    BigInt(requiredArgument("--from-block")),
+    BigInt(requiredArgument("--to-block")),
+  );
+}
+
+async function sevenDayBackfill() {
+  const env = parseRuntimeEnv(process.env);
+  const range = await resolveSevenDayRange(
+    env.HYPEREVM_RPC_URL,
+    env.FINALITY_LAG,
+  );
+  console.log(
+    JSON.stringify({
+      status: "range-resolved",
+      fromBlock: range.fromBlock.toString(),
+      toBlock: range.toBlock.toString(),
+      finalizedTimestamp: range.finalizedTimestamp.toString(),
+    }),
+  );
+  await runIngestion(range.fromBlock, range.toBlock);
+}
+
+async function sync() {
+  const env = parseRuntimeEnv(process.env);
+  const { pool } = createDatabase(env);
+  try {
+    const status = await indexerStatus(pool, indexerScope());
+    const checkpoint = status.checkpoint as { next_block?: string } | null;
+    if (!checkpoint?.next_block)
+      throw new Error("No checkpoint exists; run a backfill first");
+    const range = await resolveSevenDayRange(
+      env.HYPEREVM_RPC_URL,
+      env.FINALITY_LAG,
+    );
+    if (BigInt(checkpoint.next_block) > range.toBlock) {
+      console.log(
+        JSON.stringify({
+          status: "noop",
+          reason: "checkpoint is already at the finalized head",
+          nextBlock: checkpoint.next_block,
+          finalizedHead: range.toBlock.toString(),
+        }),
+      );
+      return;
+    }
+    await runIngestion(BigInt(checkpoint.next_block), range.toBlock);
+  } finally {
+    await pool.end();
+  }
+}
+
+async function showIndexerStatus() {
+  const env = parseRuntimeEnv(process.env);
+  const { pool } = createDatabase(env);
+  try {
+    console.log(
+      JSON.stringify(await indexerStatus(pool, indexerScope()), null, 2),
+    );
+  } finally {
+    await pool.end();
+  }
+}
+
+async function showCoverage() {
+  const env = parseRuntimeEnv(process.env);
+  const { pool } = createDatabase(env);
+  try {
+    console.log(
+      JSON.stringify(
+        await verifyCoverage(
+          pool,
+          indexerScope(),
+          BigInt(requiredArgument("--from-block")),
+          BigInt(requiredArgument("--to-block")),
+        ),
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await pool.end();
+  }
+}
+
 async function main() {
   switch (command) {
     case "config-check":
@@ -112,9 +261,24 @@ async function main() {
     case "preflight":
       await preflight();
       return;
+    case "backfill":
+      await backfill();
+      return;
+    case "seven-day-backfill":
+      await sevenDayBackfill();
+      return;
+    case "sync":
+      await sync();
+      return;
+    case "status":
+      await showIndexerStatus();
+      return;
+    case "verify-coverage":
+      await showCoverage();
+      return;
     default:
       throw new Error(
-        "Usage: npm run cli -- <config-check|db-ping|discover|preflight> [--block latest|NUMBER] [--rpc public|alchemy|archive]",
+        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage>",
       );
   }
 }

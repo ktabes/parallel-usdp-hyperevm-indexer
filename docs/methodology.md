@@ -23,4 +23,4 @@ Token quantities, fixed-point rates, prices, and USD values remain integer base 
 
 ## Recovery
 
-Backfill and incremental sync use the same ingestion path. Each range is idempotent, checkpoint hashes are verified before resume, and overlap is safe because `(chain_id, transaction_hash, log_index)` is unique.
+Backfill and incremental sync use the same ingestion path. Each completed RPC range receives a durable coverage row, and overlap is safe because `(chain_id, transaction_hash, log_index)` is unique. The checkpoint advances after the coverage row and raw logs commit atomically. Periodic finalized block-hash anchors are verified before resume, providing drift detection without adding one block request to every 50-block log chunk.

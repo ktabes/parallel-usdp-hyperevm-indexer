@@ -4,7 +4,7 @@ An independent, auditable indexer and analytics surface for Parallel V3 USDp and
 
 ## Current status
 
-Phase 1 candidate. Official deployment artifacts, contract identities, proxy implementations, Parallelizer facets and collateral relationships, ABI provenance, deployment blocks, metric definitions, and DIA price feeds are executable and verified against current HyperEVM state. A sparse OnFinality archive probe reproduced the exact sUSDp deployment block, but approval remains gated on repeating the complete discovery through an authenticated archive endpoint at a pinned finalized block.
+Phase 1 remains an explicitly labeled discovery candidate because the free providers do not support a complete pinned archive run. The Phase 2 demo pipeline is implemented separately: it scans finalized public-RPC logs, persists immutable raw evidence and decoded events, records exact coverage, and resumes through PostgreSQL checkpoints. Historical metrics remain unavailable until the seven-day coverage gate completes.
 
 ## Product boundary
 
@@ -36,6 +36,11 @@ npm run cli -- discover --block latest
 npm run cli -- discover --rpc archive --block FINALIZED_BLOCK_NUMBER
 npm run cli -- discover --rpc alchemy --block FINALIZED_BLOCK_NUMBER
 npm run cli -- preflight
+npm run cli -- backfill --from-block FROM --to-block TO
+npm run cli -- seven-day-backfill
+npm run cli -- sync
+npm run cli -- status
+npm run cli -- verify-coverage --from-block FROM --to-block TO
 npm run test:unit
 npm run test:fixtures
 npm run test:integration
@@ -44,7 +49,7 @@ npm run test:network
 
 Network tests are opt-in and require `RUN_NETWORK_TESTS=1` plus a real `HYPEREVM_RPC_URL`. Integration tests run when `TEST_DATABASE_URL` is present and otherwise report as skipped.
 
-The official HyperEVM RPC is the default current-state and bounded-log source, but it does not honor historical `eth_call` state and limits `eth_getLogs` to 50-block ranges. The optional `ALCHEMY_API_KEY` provides a recent-state/log fallback, but live probing showed it is not archival. OnFinality's anonymous public archive works for sparse historical proof calls but rate-limits complete discovery; set a free `ONFINALITY_API_KEY` to run `--rpc archive`. Provider roles are assigned from live capability evidence rather than marketing claims.
+The official HyperEVM RPC is the default seven-day log source. It limits `eth_getLogs` to 50-block ranges and approximately 100 requests per minute, so the initial week is a long, resumable one-time job rather than a deployment startup task. The optional `ALCHEMY_API_KEY` provides recent-state reads but is not treated as historical. OnFinality remains optional for strict archive certification. Provider roles are assigned from live capability evidence rather than marketing claims.
 
 ## Phase gates
 
