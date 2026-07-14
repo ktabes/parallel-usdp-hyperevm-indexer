@@ -51,6 +51,8 @@ Network tests are opt-in and require `RUN_NETWORK_TESTS=1` plus a real `HYPEREVM
 
 The official HyperEVM RPC is the default seven-day log source. It limits `eth_getLogs` to 50-block ranges and approximately 100 requests per minute, so the initial week is a long, resumable one-time job rather than a deployment startup task. The optional `ALCHEMY_API_KEY` provides recent-state reads but is not treated as historical. OnFinality remains optional for strict archive certification. Provider roles are assigned from live capability evidence rather than marketing claims.
 
+On Railway, set `RUN_SEVEN_DAY_BACKFILL=1` to start the worker beside the web service. A PostgreSQL advisory lock prevents duplicate workers, and `/api/indexer/status` exposes the checkpoint, stored row counts, and recent runs. Set the flag back to `0` after the initial week completes if continuous catch-up is not wanted.
+
 ## Phase gates
 
 1. Foundation and guardrails.

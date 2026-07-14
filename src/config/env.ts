@@ -13,6 +13,11 @@ const optionalSecret = z.preprocess(
   z.string().min(1).optional(),
 );
 
+const booleanFlag = z
+  .enum(["0", "1"])
+  .default("0")
+  .transform((value) => value === "1");
+
 export const runtimeEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -23,6 +28,7 @@ export const runtimeEnvSchema = z.object({
   HYPEREVM_RPC_URL: z.url("HYPEREVM_RPC_URL must be a valid URL"),
   ALCHEMY_API_KEY: optionalSecret,
   ONFINALITY_API_KEY: optionalSecret,
+  RUN_SEVEN_DAY_BACKFILL: booleanFlag,
   FINALITY_LAG: integerFromString("FINALITY_LAG", 1, 10_000).default(5),
   RPC_LOG_CHUNK_SIZE: integerFromString(
     "RPC_LOG_CHUNK_SIZE",
