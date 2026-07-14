@@ -19,21 +19,17 @@ function rateLimitedTransport(
 ): Transport {
   const limited = (config: Parameters<Transport>[0]) => {
     const base = transport(config);
-    let queue = Promise.resolve();
+    let nextStartAt = 0;
 
     return {
       ...base,
-      request: (args: Parameters<typeof base.request>[0]) => {
-        const request = queue.then(() => base.request(args));
-        queue = request
-          .catch(() => undefined)
-          .then(
-            () =>
-              new Promise<void>((resolve) =>
-                setTimeout(resolve, minRequestIntervalMs),
-              ),
-          );
-        return request;
+      request: async (args: Parameters<typeof base.request>[0]) => {
+        const scheduledAt = Math.max(Date.now(), nextStartAt);
+        nextStartAt = scheduledAt + minRequestIntervalMs;
+        const delay = scheduledAt - Date.now();
+        if (delay > 0)
+          await new Promise<void>((resolve) => setTimeout(resolve, delay));
+        return base.request(args);
       },
     };
   };

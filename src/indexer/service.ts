@@ -49,6 +49,7 @@ export interface IngestLogsOptions {
   requestIntervalMs?: number;
   maxRetries?: number;
   anchorEveryChunks?: number;
+  fetchConcurrency?: number;
   signal?: AbortSignal;
   onProgress?: (progress: IngestionProgress) => void;
 }
@@ -410,56 +411,81 @@ export async function ingestLogs(
         await updateRun(options.pool, runId, "interrupted", counters);
         return progress("interrupted");
       }
-      const fetched = await fetchLogsWithPolicy(
-        client,
-        nextBlock,
-        options.toBlock,
-        activeChunkSize,
-        options.maxRetries ?? 5,
-        counters,
-      );
-      activeChunkSize = fetched.chunkSize;
-      const blocksByNumber = new Map<bigint, StoredBlock>();
-      for (const blockNumber of new Set(
-        fetched.logs
-          .map((log) => log.blockNumber)
-          .filter((number): number is bigint => number !== null),
-      )) {
-        blocksByNumber.set(
-          blockNumber,
-          asStoredBlock(await client.getBlock({ blockNumber })),
+      const plannedRanges: BlockRange[] = [];
+      let plannedFrom = nextBlock;
+      const fetchConcurrency = Math.max(1, options.fetchConcurrency ?? 50);
+      while (
+        plannedFrom <= options.toBlock &&
+        plannedRanges.length < fetchConcurrency
+      ) {
+        const range = planBlockRange(
+          plannedFrom,
+          options.toBlock,
+          activeChunkSize,
         );
+        plannedRanges.push(range);
+        plannedFrom = range.toBlock + 1n;
       }
-      const isFinalChunk = fetched.range.toBlock === options.toBlock;
-      const shouldAnchor =
-        isFinalChunk || (counters.chunks + 1) % anchorEveryChunks === 0;
-      const anchor = shouldAnchor
-        ? asStoredBlock(
-            await client.getBlock({ blockNumber: fetched.range.toBlock }),
-          )
-        : undefined;
-
-      counters.logsFetched += fetched.logs.length;
-      await persistChunk(
-        options.pool,
-        scope,
-        runId,
-        fetched.range,
-        fetched.logs,
-        blocksByNumber,
-        anchor,
-        counters,
+      const fetchedBatch = await Promise.all(
+        plannedRanges.map((range) =>
+          fetchLogsWithPolicy(
+            client,
+            range.fromBlock,
+            range.toBlock,
+            activeChunkSize,
+            options.maxRetries ?? 5,
+            counters,
+          ),
+        ),
       );
-      counters.chunks += 1;
-      counters.blocksCovered = (
-        BigInt(counters.blocksCovered) +
-        fetched.range.toBlock -
-        fetched.range.fromBlock +
-        1n
-      ).toString();
-      nextBlock = fetched.range.toBlock + 1n;
-      await updateRun(options.pool, runId, "running", counters);
-      options.onProgress?.(progress("running"));
+
+      for (let index = 0; index < fetchedBatch.length; index += 1) {
+        const fetched = fetchedBatch[index]!;
+        const planned = plannedRanges[index]!;
+        activeChunkSize = fetched.chunkSize;
+        const blocksByNumber = new Map<bigint, StoredBlock>();
+        for (const blockNumber of new Set(
+          fetched.logs
+            .map((log) => log.blockNumber)
+            .filter((number): number is bigint => number !== null),
+        )) {
+          blocksByNumber.set(
+            blockNumber,
+            asStoredBlock(await client.getBlock({ blockNumber })),
+          );
+        }
+        const isFinalChunk = fetched.range.toBlock === options.toBlock;
+        const shouldAnchor =
+          isFinalChunk || (counters.chunks + 1) % anchorEveryChunks === 0;
+        const anchor = shouldAnchor
+          ? asStoredBlock(
+              await client.getBlock({ blockNumber: fetched.range.toBlock }),
+            )
+          : undefined;
+
+        counters.logsFetched += fetched.logs.length;
+        await persistChunk(
+          options.pool,
+          scope,
+          runId,
+          fetched.range,
+          fetched.logs,
+          blocksByNumber,
+          anchor,
+          counters,
+        );
+        counters.chunks += 1;
+        counters.blocksCovered = (
+          BigInt(counters.blocksCovered) +
+          fetched.range.toBlock -
+          fetched.range.fromBlock +
+          1n
+        ).toString();
+        nextBlock = fetched.range.toBlock + 1n;
+        await updateRun(options.pool, runId, "running", counters);
+        options.onProgress?.(progress("running"));
+        if (fetched.range.toBlock !== planned.toBlock) break;
+      }
     }
     await updateRun(options.pool, runId, "completed", counters);
     return progress("completed");
