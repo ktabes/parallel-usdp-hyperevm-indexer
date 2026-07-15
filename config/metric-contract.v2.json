@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 2,
+  "calculationVersion": "parallel-usdp-cross-chain-metrics-v2-candidate",
+  "status": "candidate",
+  "assetScope": "cross-chain",
+  "timestampConvention": "global as_of timestamp with finalized per-chain component timestamps in UTC",
+  "numericPolicy": "integer base units only; decimal formatting at presentation boundaries",
+  "coveragePolicy": "global values identify expected, included, stale, missing, and unreconciled chains; partial coverage is never complete",
+  "assets": {
+    "usdp": {
+      "expectedChainCount": 24,
+      "bridgeAccountingStatus": "candidate_pending_v3_bridge_proof"
+    },
+    "susdp": {
+      "expectedChainIds": [1, 8453, 146, 999, 43114],
+      "expectedChainCount": 5
+    }
+  },
+  "metrics": [
+    {
+      "id": "usdp_chain_total_supply",
+      "scope": "chain",
+      "unit": "usdp_base_units",
+      "source": "chain USDp.totalSupply()",
+      "formula": "direct finalized pinned-block contract read"
+    },
+    {
+      "id": "usdp_global_total_supply",
+      "scope": "global",
+      "unit": "usdp_base_units",
+      "source": "aligned verified usdp_chain_total_supply components",
+      "formula": "sum(chain_total_supply)",
+      "unavailableWhen": "any material deployment is missing or bridge accounting can double count circulation"
+    },
+    {
+      "id": "usdp_global_market_value_usd",
+      "scope": "global",
+      "unit": "usd_atomic",
+      "source": "usdp_global_total_supply and attributed timestamped USDp price",
+      "formula": "usdp_global_total_supply * usdp_price_usd",
+      "unavailableWhen": "global supply is incomplete or price evidence is stale"
+    },
+    {
+      "id": "susdp_chain_total_assets_usdp",
+      "scope": "chain",
+      "unit": "usdp_base_units",
+      "source": "chain sUSDp.totalAssets()",
+      "formula": "direct finalized pinned-block contract read"
+    },
+    {
+      "id": "susdp_global_tvl_usd",
+      "scope": "global",
+      "unit": "usd_atomic",
+      "source": "aligned chain totalAssets and timestamped USDp prices",
+      "formula": "sum(chain_total_assets_usdp * chain_usdp_price_usd)",
+      "unavailableWhen": "any of the five official savings chains is missing, stale, or unreconciled"
+    },
+    {
+      "id": "susdp_chain_share_price_usdp",
+      "scope": "chain",
+      "unit": "usdp_per_share_atomic",
+      "source": "chain sUSDp.convertToAssets(10^shareDecimals)",
+      "formula": "direct finalized pinned-block contract read"
+    },
+    {
+      "id": "susdp_chain_ypo_usdp",
+      "scope": "chain",
+      "unit": "usdp_base_units",
+      "source": "chain Savings.Accrued events and pending-yield boundary reads",
+      "formula": "sum(accrued_interest in (start,end]) + pending_yield(end) - pending_yield(start)",
+      "windowConvention": "(start_block,end_block]"
+    },
+    {
+      "id": "susdp_global_ypo_usdp",
+      "scope": "global",
+      "unit": "usdp_base_units",
+      "source": "aligned and reconciled susdp_chain_ypo_usdp components",
+      "formula": "sum(chain_native_ypo_usdp)",
+      "unavailableWhen": "chain windows are not time-aligned or any savings chain is incomplete"
+    },
+    {
+      "id": "susdp_chain_apy",
+      "scope": "chain",
+      "unit": "fixed_18",
+      "source": "chain rate state and reconciled share-price observations",
+      "formula": "annualized exact share-price return over the selected trailing window"
+    },
+    {
+      "id": "susdp_global_tvl_weighted_apy",
+      "scope": "global",
+      "unit": "fixed_18",
+      "source": "aligned chain APY and chain TVL components",
+      "formula": "sum(chain_tvl_usd * chain_apy) / sum(chain_tvl_usd)",
+      "unavailableWhen": "any material savings-chain APY or TVL component is unavailable"
+    },
+    {
+      "id": "usdp_chain_bridge_net_flow",
+      "scope": "chain",
+      "unit": "usdp_base_units",
+      "source": "verified USDp bridge events",
+      "formula": "bridge_inflow - bridge_outflow",
+      "classificationRule": "never count bridge movement as issuer issuance or redemption"
+    },
+    {
+      "id": "susdp_chain_net_flow",
+      "scope": "chain",
+      "unit": "usdp_base_units",
+      "source": "chain ERC-4626 Deposit and Withdraw events",
+      "formula": "sum(deposit.assets) - sum(withdraw.assets)"
+    }
+  ],
+  "nonApplicableMetrics": [
+    "native_borrowers",
+    "native_borrows",
+    "native_repays",
+    "native_liquidations"
+  ]
+}

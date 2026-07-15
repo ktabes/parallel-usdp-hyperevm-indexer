@@ -24,6 +24,20 @@ The Phase 4 candidate migration adds finalized evidence and interval calculation
 
 Snapshot capture is independent of historical log coverage. YPO derivation is not: the supported calculation refuses to write unless both exact boundary snapshots exist and the complete interval passes the coverage check.
 
+## Cross-chain extension boundary
+
+Decision 0002 changes the product scope from one market on HyperEVM to canonical USDp and sUSDp assets with chain components. The existing source tables already partition immutable evidence, coverage, checkpoints, runs, prices, flows, snapshots, and yield by `chain_id`, so the verified HyperEVM rows remain valid.
+
+Before a second chain adapter writes production data, the next migration will add normalized cross-chain identity and aggregation tables instead of making chain-specific columns nullable:
+
+- `asset_deployments`: canonical asset ID, chain ID, contract address, deployment role, official-source attribution, manifest, and adapter status.
+- `asset_chain_snapshots`: finalized per-deployment token supply and price evidence.
+- `savings_chain_snapshots`: ERC-4626 state referencing the sUSDp deployment, underlying USDp deployment, and component price observations.
+- `global_asset_snapshots`: one asset-level calculation at an `as_of` timestamp with coverage, freshness, reconciliation, and calculation versions.
+- `global_asset_snapshot_components`: exact links from a global result to each chain snapshot used in it.
+
+The current `vault_snapshots` rows will be migrated into the normalized chain tables with their IDs and provenance retained. A global snapshot stores no opaque pre-summed number without component links. Different chains use independent block numbers and finality rules; only UTC component timestamps are aligned at the global layer.
+
 ## Rules
 
 - EVM addresses and hashes are stored lowercase after boundary validation.

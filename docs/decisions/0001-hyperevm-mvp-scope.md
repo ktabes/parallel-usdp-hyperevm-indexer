@@ -1,6 +1,6 @@
 # Decision 0001: HyperEVM-only Parallel MVP
 
-- Status: accepted from owner brief; external publication decisions remain open
+- Status: superseded by Decision 0002; retained as the implementation history
 - Date: 2026-07-14
 
 ## Decision
@@ -8,6 +8,8 @@
 Build the first shareable dataset for Parallel V3 USDp and sUSDp on HyperEVM. Index the issuer/parallelizer and ERC-4626 savings layer for the most recent finalized seven days. Treat native YPO, sUSDp state, exact flows, and reconciliation as the core proof.
 
 External lending venues, cross-chain accounting, complete collateral valuation, and longer history are post-MVP work unless their absence prevents the core proof.
+
+Decision 0002 changes the product scope to canonical cross-chain USDp and sUSDp assets. The completed HyperEVM work remains the first verified chain adapter and is not discarded.
 
 ## Why
 

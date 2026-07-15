@@ -2,7 +2,7 @@
   "name": "parallel-usdp-hyperevm-indexer",
   "version": "0.1.0",
   "private": true,
-  "description": "Auditable HyperEVM indexer and analytics surface for Parallel USDp and sUSDp.",
+  "description": "Auditable cross-chain indexer and analytics surface for Parallel USDp and sUSDp.",
   "engines": {
     "node": ">=22.11 <26"
   },

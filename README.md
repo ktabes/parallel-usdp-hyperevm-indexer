@@ -1,19 +1,22 @@
-# Parallel USDp + sUSDp HyperEVM Indexer
+# Parallel USDp + sUSDp Cross-Chain Indexer
 
-An independent, auditable indexer and analytics surface for Parallel V3 USDp and sUSDp on HyperEVM. The shareable MVP is designed to produce StableWatch-compatible market metrics while making every number traceable to finalized blocks, source logs, contract reads, a metric definition, and reconciliation evidence.
+An independent, auditable indexer and analytics surface for Parallel V3 USDp and sUSDp as cross-chain assets. The shareable build is designed to produce StableWatch-compatible global metrics and chain breakdowns while making every number traceable to finalized blocks, source logs, contract reads, a metric definition, and reconciliation evidence.
 
 ## Current status
 
-Phase 1 remains an explicitly labeled discovery candidate because the free providers do not support a complete pinned archive run. The Phase 2 demo pipeline is implemented separately: it scans finalized public-RPC logs, persists immutable raw evidence and decoded events, records exact coverage, and resumes through PostgreSQL checkpoints. Historical metrics remain unavailable until the seven-day coverage gate completes.
+HyperEVM is the first verified chain adapter and already captures finalized state, immutable log evidence, exact coverage, decoded economic events, and snapshot/YPO foundations. The canonical registry now models all 24 official USDp deployments and the five official sUSDp vault chains. Cross-chain global values remain partial or unavailable until the required adapters, snapshot alignment, bridge-accounting proof, and reconciliation gates are complete.
 
 ## Product boundary
 
-- HyperEVM only.
-- Parallel V3 USDp issuer/parallelizer and sUSDp ERC-4626 savings vault.
+- Canonical Parallel V3 USDp and sUSDp asset scope, with per-chain components.
+- USDp deployment coverage target: all 24 chains published by Parallel.
+- sUSDp savings coverage target: Ethereum, Base, Sonic, HyperEVM, and Avalanche.
+- HyperEVM remains the live first adapter while the other chains are added.
 - Seven finalized days for the initial historical window.
 - External lending markets are out of the MVP.
 - Borrow, repay, and liquidation metrics are not applicable at the native issuer/savings layer.
 - Yield Paid Out is the centerpiece; unsupported 30d, 90d, and all-time windows stay unavailable until fully indexed and reconciled.
+- Global results expose expected, included, missing, stale, and unreconciled chains; partial data is never presented as complete.
 
 ## Local setup
 
@@ -71,9 +74,11 @@ On Railway, set `RUN_SEVEN_DAY_BACKFILL=1` to start the worker beside the web se
 2. Pinned protocol discovery and executable metric specification.
 3. Idempotent finalized raw-log ingestion and seven-day backfill.
 4. Economic events, flows, participants, and optional lifetime holder ledger.
-5. Snapshots, prices, YPO, and live projection.
-6. Reconciliation and explicit failure evidence.
-7. Owner review, then the public inspection dashboard.
-8. Railway deployment and StableWatch integration handoff.
+5. HyperEVM snapshots, prices, YPO, and live projection foundation.
+6. Ethereum, Base, Sonic, and Avalanche state adapters and global sUSDp metrics.
+7. Per-chain historical YPO/flows and aligned cross-chain aggregation.
+8. Remaining USDp distribution chains and verified bridge accounting.
+9. Reconciliation, owner review, and the public inspection dashboard.
+10. Railway deployment and StableWatch integration handoff.
 
-See [methodology](docs/methodology.md), [metric contract](docs/metric-contract.md), [schema notes](docs/schema.md), and the [Phase 0 scope decision](docs/decisions/0001-hyperevm-mvp-scope.md).
+See [methodology](docs/methodology.md), [metric contract](docs/metric-contract.md), [schema notes](docs/schema.md), and the [cross-chain scope decision](docs/decisions/0002-cross-chain-asset-scope.md).
