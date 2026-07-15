@@ -6,6 +6,7 @@ import {
   savingsAbi,
 } from "@/protocol/abis";
 import { hyperevmProtocol } from "@/protocol/hyperevm";
+import { savingsChainAdapters } from "@/protocol/savings-chains";
 
 interface DecoderDefinition {
   role: string;
@@ -13,24 +14,33 @@ interface DecoderDefinition {
   abi: typeof erc20Abi | typeof savingsAbi | typeof parallelizerAbi;
 }
 
-const decoders = new Map<string, DecoderDefinition>([
-  [
-    hyperevmProtocol.contracts.usdp.address.toLowerCase(),
-    { role: "usdp-token", version: "usdp-token-v1", abi: erc20Abi },
-  ],
-  [
-    hyperevmProtocol.contracts.susdp.address.toLowerCase(),
-    { role: "susdp-savings", version: "susdp-savings-v1", abi: savingsAbi },
-  ],
-  [
-    hyperevmProtocol.contracts.parallelizer.address.toLowerCase(),
-    {
-      role: "usdp-parallelizer",
-      version: "parallelizer-v1",
-      abi: parallelizerAbi,
-    },
-  ],
-]);
+const decoderKey = (chainId: number, address: Address | string) =>
+  `${chainId}:${address.toLowerCase()}`;
+
+const decoders = new Map<string, DecoderDefinition>();
+for (const adapter of savingsChainAdapters) {
+  decoders.set(decoderKey(adapter.chainId, adapter.usdp.address), {
+    role: "usdp-token",
+    version: "usdp-token-v1",
+    abi: erc20Abi,
+  });
+  decoders.set(decoderKey(adapter.chainId, adapter.susdp.address), {
+    role: "susdp-savings",
+    version: "susdp-savings-v1",
+    abi: savingsAbi,
+  });
+}
+decoders.set(
+  decoderKey(
+    hyperevmProtocol.chainId,
+    hyperevmProtocol.contracts.parallelizer.address,
+  ),
+  {
+    role: "usdp-parallelizer",
+    version: "parallelizer-v1",
+    abi: parallelizerAbi,
+  },
+);
 const knownEventTopics = new Set(
   Object.values(protocolEventTopics).map((topic) => topic.toLowerCase()),
 );
@@ -53,20 +63,26 @@ export interface DecodedProtocolEvent {
   decoderVersion: string;
 }
 
-export function decoderVersionForAddress(address: Address | string) {
-  return decoders.get(address.toLowerCase())?.version ?? "unknown-v1";
+export function decoderVersionForAddress(
+  chainId: number,
+  address: Address | string,
+) {
+  return decoders.get(decoderKey(chainId, address))?.version ?? "unknown-v1";
 }
 
 export function isKnownProtocolEventTopic(topic: string | undefined) {
   return Boolean(topic && knownEventTopics.has(topic.toLowerCase()));
 }
 
-export function decodeProtocolLog(log: {
-  address: Address;
-  data: Hex;
-  topics: readonly Hex[];
-}): DecodedProtocolEvent | undefined {
-  const decoder = decoders.get(log.address.toLowerCase());
+export function decodeProtocolLog(
+  chainId: number,
+  log: {
+    address: Address;
+    data: Hex;
+    topics: readonly Hex[];
+  },
+): DecodedProtocolEvent | undefined {
+  const decoder = decoders.get(decoderKey(chainId, log.address));
   if (!decoder || !log.topics[0]) return undefined;
   try {
     const decoded = decodeEventLog({

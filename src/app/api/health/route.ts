@@ -6,8 +6,8 @@ export function GET() {
   return NextResponse.json({
     status: "ok",
     service: "parallel-usdp-hyperevm-indexer",
-    phase: 5,
-    phaseStatus: "multichain-candidate",
+    phase: 6,
+    phaseStatus: "history-foundation-candidate",
     timestamp: new Date().toISOString(),
   });
 }

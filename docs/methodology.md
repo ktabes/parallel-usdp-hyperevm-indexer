@@ -17,6 +17,10 @@ Ethereum, Base, Sonic, and Avalanche current-state adapters use the RPC `finaliz
 
 Chain-local token and vault reads remain the evidence units. A global sUSDp snapshot links to every included chain component and reports expected, included, missing, stale, and invalid chains. Global sUSDp assets and YPO are additive only across aligned valid components. The headline estimated APY is weighted by chain-local `totalAssets`; rates are never summed. USDp supply across the five savings chains is explicitly a partial distribution metric until all 24 official USDp deployments and V3 bridge accounting are verified.
 
+## Historical windows
+
+A cross-chain history job first chooses one UTC end time no later than the oldest configured chain's finalized timestamp, then resolves the first block at or after the common start and end timestamps independently on each chain. Both pinned boundary states must succeed before log ingestion begins. Each chain receives its own checkpoint and complete-coverage proof. Candidate YPO uses `Accrued` events in `(start_block,end_block]` plus the change in pending yield between the two exact boundary snapshots. A global YPO total includes only independently reconciled `verified` intervals within the alignment tolerance; candidate components remain visible but unsummed.
+
 ## Availability
 
 An unavailable metric is a typed result with a reason, not `0`, `null` without context, or an estimate presented as finalized. This applies especially to incomplete holder reconstruction, collateral backing, 30d/90d/all-time history, and external lending activity.

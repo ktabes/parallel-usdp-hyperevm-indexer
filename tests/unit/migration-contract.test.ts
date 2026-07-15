@@ -89,4 +89,24 @@ describe("initial migration contract", () => {
       'CREATE UNIQUE INDEX "global_savings_components_chain_unique"',
     );
   });
+
+  it("adds normalized chain and component-linked global YPO intervals", async () => {
+    const migration = await readFile(
+      "drizzle/0005_lively_roxanne_simpson.sql",
+      "utf8",
+    );
+
+    expect(migration).toContain('CREATE TABLE "savings_yield_aggregates"');
+    expect(migration).toContain(
+      'CREATE TABLE "global_savings_yield_aggregates"',
+    );
+    expect(migration).toContain(
+      'CREATE TABLE "global_savings_yield_components"',
+    );
+    expect(migration).toContain('CONSTRAINT "savings_yield_range_check"');
+    expect(migration).toContain('"coverage_scope" text NOT NULL');
+    expect(migration).toContain(
+      'CREATE UNIQUE INDEX "global_savings_yield_component_chain_unique"',
+    );
+  });
 });

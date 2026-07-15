@@ -1,10 +1,9 @@
 import type { Pool, PoolClient } from "pg";
 import type { Address, Block, Hex, Log } from "viem";
 import { HYPEREVM_CHAIN_ID, hyperevmProtocol } from "@/protocol/hyperevm";
-import {
-  createHyperevmClient,
-  type HyperEvmClient,
-} from "@/rpc/hyperevm-client";
+import { hyperevm } from "@/rpc/hyperevm-client";
+import { createEvmClient, type EvmClient } from "@/rpc/evm-client";
+import type { SavingsChainAdapter } from "@/protocol/savings-chains";
 import {
   decodeProtocolLog,
   decoderVersionForAddress,
@@ -23,7 +22,7 @@ import { providerErrorMessage } from "@/rpc/errors";
 
 export const DEFAULT_INDEXER_SCOPE = "parallel-usdp-susdp-seven-day-v1";
 
-const addresses: Address[] = [
+const hyperevmAddresses: Address[] = [
   hyperevmProtocol.contracts.usdp.address,
   hyperevmProtocol.contracts.susdp.address,
   hyperevmProtocol.contracts.parallelizer.address,
@@ -56,6 +55,8 @@ export interface IngestLogsOptions {
   fetchConcurrency?: number;
   signal?: AbortSignal;
   onProgress?: (progress: IngestionProgress) => void;
+  adapter?: SavingsChainAdapter;
+  addresses?: Address[];
 }
 
 export interface IngestionProgress {
@@ -112,7 +113,8 @@ function asStoredBlock(block: Block): StoredBlock {
 }
 
 async function fetchLogsWithPolicy(
-  client: HyperEvmClient,
+  client: EvmClient,
+  addresses: Address[],
   fromBlock: bigint,
   requestedToBlock: bigint,
   initialChunkSize: number,
@@ -163,10 +165,14 @@ async function fetchLogsWithPolicy(
   }
 }
 
-async function insertBlock(client: PoolClient, block: StoredBlock) {
+async function insertBlock(
+  client: PoolClient,
+  chainId: number,
+  block: StoredBlock,
+) {
   const existing = await client.query<{ hash: string }>(
     `select hash from blocks where chain_id = $1 and number = $2`,
-    [HYPEREVM_CHAIN_ID, block.number.toString()],
+    [chainId, block.number.toString()],
   );
   const existingHash = existing.rows[0]?.hash;
   if (existingHash && existingHash.toLowerCase() !== block.hash.toLowerCase())
@@ -179,7 +185,7 @@ async function insertBlock(client: PoolClient, block: StoredBlock) {
      values ($1, $2, $3, $4, $5, true)
      on conflict (chain_id, number) do nothing`,
     [
-      HYPEREVM_CHAIN_ID,
+      chainId,
       block.number.toString(),
       block.hash.toLowerCase(),
       block.parentHash.toLowerCase(),
@@ -190,6 +196,7 @@ async function insertBlock(client: PoolClient, block: StoredBlock) {
 
 async function persistChunk(
   pool: Pool,
+  chainId: number,
   scope: string,
   runId: string,
   range: BlockRange,
@@ -202,8 +209,8 @@ async function persistChunk(
   try {
     await database.query("begin");
     for (const block of blocksByNumber.values())
-      await insertBlock(database, block);
-    if (anchor) await insertBlock(database, anchor);
+      await insertBlock(database, chainId, block);
+    if (anchor) await insertBlock(database, chainId, anchor);
 
     for (const log of logs) {
       if (
@@ -214,7 +221,7 @@ async function persistChunk(
         log.logIndex === null
       )
         throw new Error("RPC returned an incomplete mined log");
-      const decoderVersion = decoderVersionForAddress(log.address);
+      const decoderVersion = decoderVersionForAddress(chainId, log.address);
       const inserted = await database.query<{ id: string }>(
         `insert into raw_logs
           (chain_id, block_number, block_hash, transaction_hash,
@@ -224,7 +231,7 @@ async function persistChunk(
          on conflict (chain_id, transaction_hash, log_index) do nothing
          returning id`,
         [
-          HYPEREVM_CHAIN_ID,
+          chainId,
           log.blockNumber.toString(),
           log.blockHash.toLowerCase(),
           log.transactionHash.toLowerCase(),
@@ -244,7 +251,7 @@ async function persistChunk(
         continue;
       }
       counters.rawLogsInserted += 1;
-      const decoded = decodeProtocolLog({
+      const decoded = decodeProtocolLog(chainId, {
         address: log.address,
         data: log.data,
         topics: log.topics as readonly Hex[],
@@ -262,7 +269,7 @@ async function persistChunk(
          on conflict (raw_log_id) do nothing`,
         [
           rawLogId,
-          HYPEREVM_CHAIN_ID,
+          chainId,
           log.blockNumber.toString(),
           log.transactionHash.toLowerCase(),
           Number(log.logIndex),
@@ -281,7 +288,7 @@ async function persistChunk(
        values ($1,$2,$3,$4,$5)
        on conflict (chain_id, scope, from_block, to_block) do nothing`,
       [
-        HYPEREVM_CHAIN_ID,
+        chainId,
         scope,
         range.fromBlock.toString(),
         range.toBlock.toString(),
@@ -299,7 +306,7 @@ async function persistChunk(
          last_completed_block_hash = coalesce(excluded.last_completed_block_hash, indexer_checkpoints.last_completed_block_hash),
          updated_at = now()`,
       [
-        HYPEREVM_CHAIN_ID,
+        chainId,
         scope,
         (range.toBlock + 1n).toString(),
         anchor?.number.toString() ?? null,
@@ -347,12 +354,27 @@ export async function ingestLogs(
 ): Promise<IngestionProgress> {
   const scope = options.scope ?? DEFAULT_INDEXER_SCOPE;
   const counters = blankCounters();
-  const client = createHyperevmClient(options.rpcUrl, {
+  const chainId = options.adapter?.chainId ?? HYPEREVM_CHAIN_ID;
+  const chain = options.adapter?.chain ?? hyperevm;
+  const addresses =
+    options.addresses ??
+    (options.adapter
+      ? [options.adapter.usdp.address, options.adapter.susdp.address]
+      : hyperevmAddresses);
+  const client = createEvmClient(chain, options.rpcUrl, {
     minRequestIntervalMs: options.requestIntervalMs ?? 650,
     retryCount: 0,
   });
-  const head = await client.getBlockNumber();
-  const finalizedHead = head - BigInt(options.finalityLag);
+  const finalizedBlock =
+    options.adapter?.finality === "rpc-finalized"
+      ? await client.getBlock({ blockTag: "finalized" })
+      : await client.getBlock({
+          blockNumber:
+            (await client.getBlockNumber()) - BigInt(options.finalityLag),
+        });
+  if (finalizedBlock.number === null)
+    throw new Error("RPC returned an unmined finalized block");
+  const finalizedHead = finalizedBlock.number;
   if (options.toBlock > finalizedHead)
     throw new Error(
       `Requested end block ${options.toBlock} exceeds finalized head ${finalizedHead}`,
@@ -363,7 +385,7 @@ export async function ingestLogs(
   const checkpoint = await options.pool.query<CheckpointRow>(
     `select next_block, last_completed_block, last_completed_block_hash
      from indexer_checkpoints where chain_id = $1 and scope = $2`,
-    [HYPEREVM_CHAIN_ID, scope],
+    [chainId, scope],
   );
   const stored = checkpoint.rows[0];
   if (stored?.last_completed_block && stored.last_completed_block_hash) {
@@ -402,7 +424,7 @@ export async function ingestLogs(
   const run = await options.pool.query<{ id: string }>(
     `insert into indexer_runs (run_type, chain_id, from_block, to_block)
      values ('backfill', $1, $2, $3) returning id`,
-    [HYPEREVM_CHAIN_ID, nextBlock.toString(), options.toBlock.toString()],
+    [chainId, nextBlock.toString(), options.toBlock.toString()],
   );
   const runId = run.rows[0]!.id;
   let activeChunkSize = options.chunkSize;
@@ -446,6 +468,7 @@ export async function ingestLogs(
             ok: true as const,
             value: await fetchLogsWithPolicy(
               client,
+              addresses,
               range.fromBlock,
               range.toBlock,
               activeChunkSize,
@@ -489,6 +512,7 @@ export async function ingestLogs(
         counters.logsFetched += fetched.logs.length;
         await persistChunk(
           options.pool,
+          chainId,
           scope,
           runId,
           fetched.range,
@@ -525,7 +549,7 @@ export async function ingestLogs(
 }
 
 export async function findBlockAtOrAfterTimestamp(
-  client: HyperEvmClient,
+  client: EvmClient,
   targetTimestamp: bigint,
   high: bigint,
 ) {
@@ -545,7 +569,7 @@ export async function resolveSevenDayRange(
   finalityLag: number,
   requestIntervalMs = 650,
 ) {
-  const client = createHyperevmClient(rpcUrl, {
+  const client = createEvmClient(hyperevm, rpcUrl, {
     minRequestIntervalMs: requestIntervalMs,
   });
   const head = await client.getBlockNumber();
@@ -558,4 +582,41 @@ export async function resolveSevenDayRange(
     toBlock,
   );
   return { fromBlock, toBlock, finalizedTimestamp: finalizedBlock.timestamp };
+}
+
+export async function resolveSavingsHistoryRange(
+  adapter: SavingsChainAdapter,
+  rpcUrl: string,
+  finalityLag: number,
+  days = 7,
+  requestIntervalMs = 650,
+) {
+  if (!Number.isInteger(days) || days < 1 || days > 365)
+    throw new Error("History days must be an integer between 1 and 365");
+  const client = createEvmClient(adapter.chain, rpcUrl, {
+    minRequestIntervalMs: requestIntervalMs,
+  });
+  const finalizedBlock =
+    adapter.finality === "rpc-finalized"
+      ? await client.getBlock({ blockTag: "finalized" })
+      : await client.getBlock({
+          blockNumber: (await client.getBlockNumber()) - BigInt(finalityLag),
+        });
+  if (finalizedBlock.number === null)
+    throw new Error(`${adapter.chainName} finalized block is incomplete`);
+  const targetTimestamp =
+    finalizedBlock.timestamp - BigInt(days) * 24n * 60n * 60n;
+  const fromBlock = await findBlockAtOrAfterTimestamp(
+    client,
+    targetTimestamp,
+    finalizedBlock.number,
+  );
+  return {
+    chainId: adapter.chainId,
+    chainSlug: adapter.chainSlug,
+    fromBlock,
+    toBlock: finalizedBlock.number,
+    targetTimestamp,
+    finalizedTimestamp: finalizedBlock.timestamp,
+  };
 }

@@ -1,0 +1,3313 @@
+{
+  "id": "a0e93e7d-764b-4d3c-8769-adb15f46c56b",
+  "prevId": "b8205c0e-2bff-4588-8c1a-643582b4c072",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.asset_chain_snapshots": {
+      "name": "asset_chain_snapshots",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "asset_id": {
+          "name": "asset_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_number": {
+          "name": "block_number",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_hash": {
+          "name": "block_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_timestamp": {
+          "name": "block_timestamp",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "finalized": {
+          "name": "finalized",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_supply": {
+          "name": "total_supply",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_status": {
+          "name": "snapshot_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "manifest_version": {
+          "name": "manifest_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "calculation_version": {
+          "name": "calculation_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "asset_chain_snapshots_provenance_unique": {
+          "name": "asset_chain_snapshots_provenance_unique",
+          "columns": [
+            {
+              "expression": "asset_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "block_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "manifest_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "calculation_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "asset_chain_snapshots_latest_idx": {
+          "name": "asset_chain_snapshots_latest_idx",
+          "columns": [
+            {
+              "expression": "asset_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "block_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "asset_chain_snapshots_deployment_fk": {
+          "name": "asset_chain_snapshots_deployment_fk",
+          "tableFrom": "asset_chain_snapshots",
+          "tableTo": "asset_deployments",
+          "columnsFrom": [
+            "asset_id",
+            "chain_id"
+          ],
+          "columnsTo": [
+            "asset_id",
+            "chain_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "asset_chain_snapshots_block_fk": {
+          "name": "asset_chain_snapshots_block_fk",
+          "tableFrom": "asset_chain_snapshots",
+          "tableTo": "blocks",
+          "columnsFrom": [
+            "chain_id",
+            "block_number"
+          ],
+          "columnsTo": [
+            "chain_id",
+            "number"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "asset_chain_snapshots_status_check": {
+          "name": "asset_chain_snapshots_status_check",
+          "value": "\"asset_chain_snapshots\".\"snapshot_status\" in ('candidate', 'verified', 'invalid')"
+        },
+        "asset_chain_snapshots_supply_check": {
+          "name": "asset_chain_snapshots_supply_check",
+          "value": "\"asset_chain_snapshots\".\"total_supply\" ~ '^[0-9]+$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.asset_deployments": {
+      "name": "asset_deployments",
+      "schema": "",
+      "columns": {
+        "asset_id": {
+          "name": "asset_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chain_slug": {
+          "name": "chain_slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chain_name": {
+          "name": "chain_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contract_address": {
+          "name": "contract_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "deployment_tier": {
+          "name": "deployment_tier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "adapter_status": {
+          "name": "adapter_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "official_source": {
+          "name": "official_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_checked_at": {
+          "name": "source_checked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "asset_deployments_chain_address_unique": {
+          "name": "asset_deployments_chain_address_unique",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "contract_address",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "asset_deployments_asset_id_chain_id_pk": {
+          "name": "asset_deployments_asset_id_chain_id_pk",
+          "columns": [
+            "asset_id",
+            "chain_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "asset_deployments_asset_check": {
+          "name": "asset_deployments_asset_check",
+          "value": "\"asset_deployments\".\"asset_id\" in ('usdp', 'susdp')"
+        },
+        "asset_deployments_tier_check": {
+          "name": "asset_deployments_tier_check",
+          "value": "\"asset_deployments\".\"deployment_tier\" in ('savings', 'distribution')"
+        },
+        "asset_deployments_status_check": {
+          "name": "asset_deployments_status_check",
+          "value": "\"asset_deployments\".\"adapter_status\" in ('planned', 'verified', 'disabled')"
+        },
+        "asset_deployments_address_check": {
+          "name": "asset_deployments_address_check",
+          "value": "\"asset_deployments\".\"contract_address\" ~ '^0x[0-9a-f]{40}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.blocks": {
+      "name": "blocks",
+      "schema": "",
+      "columns": {
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "number": {
+          "name": "number",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hash": {
+          "name": "hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "parent_hash": {
+          "name": "parent_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "timestamp": {
+          "name": "timestamp",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "finalized": {
+          "name": "finalized",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ingested_at": {
+          "name": "ingested_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "blocks_chain_hash_unique": {
+          "name": "blocks_chain_hash_unique",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "blocks_chain_id_number_pk": {
+          "name": "blocks_chain_id_number_pk",
+          "columns": [
+            "chain_id",
+            "number"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "blocks_hash_check": {
+          "name": "blocks_hash_check",
+          "value": "\"blocks\".\"hash\" ~ '^0x[0-9a-f]{64}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.contract_eras": {
+      "name": "contract_eras",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "manifest_id": {
+          "name": "manifest_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "proxy_address": {
+          "name": "proxy_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "implementation_address": {
+          "name": "implementation_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "abi_source_commit": {
+          "name": "abi_source_commit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "start_block": {
+          "name": "start_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end_block": {
+          "name": "end_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decoder_version": {
+          "name": "decoder_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "contract_eras_manifest_role_start_unique": {
+          "name": "contract_eras_manifest_role_start_unique",
+          "columns": [
+            {
+              "expression": "manifest_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "role",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "start_block",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "contract_eras_address_range_idx": {
+          "name": "contract_eras_address_range_idx",
+          "columns": [
+            {
+              "expression": "proxy_address",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "start_block",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "end_block",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "contract_eras_manifest_id_contract_manifests_id_fk": {
+          "name": "contract_eras_manifest_id_contract_manifests_id_fk",
+          "tableFrom": "contract_eras",
+          "tableTo": "contract_manifests",
+          "columnsFrom": [
+            "manifest_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "contract_eras_address_check": {
+          "name": "contract_eras_address_check",
+          "value": "\"contract_eras\".\"proxy_address\" ~ '^0x[0-9a-f]{40}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.contract_manifests": {
+      "name": "contract_manifests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "manifest_block": {
+          "name": "manifest_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "manifest_block_hash": {
+          "name": "manifest_block_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'candidate'"
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "contract_manifests_chain_block_unique": {
+          "name": "contract_manifests_chain_block_unique",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "manifest_block",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "contract_manifests_status_check": {
+          "name": "contract_manifests_status_check",
+          "value": "\"contract_manifests\".\"status\" in ('candidate', 'approved', 'superseded')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.economic_events": {
+      "name": "economic_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "protocol_event_id": {
+          "name": "protocol_event_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_number": {
+          "name": "block_number",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transaction_hash": {
+          "name": "transaction_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "log_index": {
+          "name": "log_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "classification": {
+          "name": "classification",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_base_units": {
+          "name": "amount_base_units",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "asset_address": {
+          "name": "asset_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "primary_participant": {
+          "name": "primary_participant",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "secondary_participant": {
+          "name": "secondary_participant",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "transaction_context": {
+          "name": "transaction_context",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "source_from_block": {
+          "name": "source_from_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_to_block": {
+          "name": "source_to_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "manifest_version": {
+          "name": "manifest_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "calculation_version": {
+          "name": "calculation_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "economic_events_protocol_event_unique": {
+          "name": "economic_events_protocol_event_unique",
+          "columns": [
+            {
+              "expression": "protocol_event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "economic_events_chain_block_idx": {
+          "name": "economic_events_chain_block_idx",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "block_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "economic_events_classification_block_idx": {
+          "name": "economic_events_classification_block_idx",
+          "columns": [
+            {
+              "expression": "classification",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "block_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "economic_events_protocol_event_id_protocol_events_id_fk": {
+          "name": "economic_events_protocol_event_id_protocol_events_id_fk",
+          "tableFrom": "economic_events",
+          "tableTo": "protocol_events",
+          "columnsFrom": [
+            "protocol_event_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "economic_events_source_range_check": {
+          "name": "economic_events_source_range_check",
+          "value": "\"economic_events\".\"source_to_block\" >= \"economic_events\".\"source_from_block\""
+        },
+        "economic_events_amount_check": {
+          "name": "economic_events_amount_check",
+          "value": "\"economic_events\".\"amount_base_units\" is null or \"economic_events\".\"amount_base_units\" ~ '^[0-9]+$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.flow_aggregates": {
+      "name": "flow_aggregates",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "granularity": {
+          "name": "granularity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bucket_start": {
+          "name": "bucket_start",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metric": {
+          "name": "metric",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_base_units": {
+          "name": "amount_base_units",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_count": {
+          "name": "event_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "unique_participants": {
+          "name": "unique_participants",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_from_block": {
+          "name": "source_from_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_to_block": {
+          "name": "source_to_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "manifest_version": {
+          "name": "manifest_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "calculation_version": {
+          "name": "calculation_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "flow_aggregates_provenance_bucket_unique": {
+          "name": "flow_aggregates_provenance_bucket_unique",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "granularity",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "bucket_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "metric",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "source_from_block",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "source_to_block",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "manifest_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "calculation_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "flow_aggregates_chain_bucket_idx": {
+          "name": "flow_aggregates_chain_bucket_idx",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "bucket_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "flow_aggregates_granularity_check": {
+          "name": "flow_aggregates_granularity_check",
+          "value": "\"flow_aggregates\".\"granularity\" in ('hour', 'day')"
+        },
+        "flow_aggregates_amount_check": {
+          "name": "flow_aggregates_amount_check",
+          "value": "\"flow_aggregates\".\"amount_base_units\" ~ '^[0-9]+$'"
+        },
+        "flow_aggregates_source_range_check": {
+          "name": "flow_aggregates_source_range_check",
+          "value": "\"flow_aggregates\".\"source_to_block\" >= \"flow_aggregates\".\"source_from_block\""
+        },
+        "flow_aggregates_counts_check": {
+          "name": "flow_aggregates_counts_check",
+          "value": "\"flow_aggregates\".\"event_count\" >= 0 and \"flow_aggregates\".\"unique_participants\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.global_savings_snapshot_components": {
+      "name": "global_savings_snapshot_components",
+      "schema": "",
+      "columns": {
+        "global_snapshot_id": {
+          "name": "global_snapshot_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "savings_snapshot_id": {
+          "name": "savings_snapshot_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "global_savings_components_chain_unique": {
+          "name": "global_savings_components_chain_unique",
+          "columns": [
+            {
+              "expression": "global_snapshot_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "global_savings_snapshot_components_global_snapshot_id_global_savings_snapshots_id_fk": {
+          "name": "global_savings_snapshot_components_global_snapshot_id_global_savings_snapshots_id_fk",
+          "tableFrom": "global_savings_snapshot_components",
+          "tableTo": "global_savings_snapshots",
+          "columnsFrom": [
+            "global_snapshot_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "global_savings_snapshot_components_savings_snapshot_id_savings_chain_snapshots_id_fk": {
+          "name": "global_savings_snapshot_components_savings_snapshot_id_savings_chain_snapshots_id_fk",
+          "tableFrom": "global_savings_snapshot_components",
+          "tableTo": "savings_chain_snapshots",
+          "columnsFrom": [
+            "savings_snapshot_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "global_savings_snapshot_components_global_snapshot_id_savings_snapshot_id_pk": {
+          "name": "global_savings_snapshot_components_global_snapshot_id_savings_snapshot_id_pk",
+          "columns": [
+            "global_snapshot_id",
+            "savings_snapshot_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.global_savings_snapshots": {
+      "name": "global_savings_snapshots",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "as_of": {
+          "name": "as_of",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expected_chain_count": {
+          "name": "expected_chain_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "included_chain_count": {
+          "name": "included_chain_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "coverage_status": {
+          "name": "coverage_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usdp_supply_on_savings_chains": {
+          "name": "usdp_supply_on_savings_chains",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_total_assets": {
+          "name": "susdp_total_assets",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_total_supply": {
+          "name": "susdp_total_supply",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_weighted_estimated_apy": {
+          "name": "susdp_weighted_estimated_apy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "oldest_component_timestamp": {
+          "name": "oldest_component_timestamp",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "newest_component_timestamp": {
+          "name": "newest_component_timestamp",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "maximum_component_age_seconds": {
+          "name": "maximum_component_age_seconds",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "included_chain_ids": {
+          "name": "included_chain_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "missing_chain_ids": {
+          "name": "missing_chain_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "stale_chain_ids": {
+          "name": "stale_chain_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "calculation_version": {
+          "name": "calculation_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "global_savings_snapshots_as_of_idx": {
+          "name": "global_savings_snapshots_as_of_idx",
+          "columns": [
+            {
+              "expression": "as_of",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "global_savings_snapshots_status_check": {
+          "name": "global_savings_snapshots_status_check",
+          "value": "\"global_savings_snapshots\".\"coverage_status\" in ('complete', 'partial', 'unavailable')"
+        },
+        "global_savings_snapshots_counts_check": {
+          "name": "global_savings_snapshots_counts_check",
+          "value": "\"global_savings_snapshots\".\"expected_chain_count\" >= 0\n        and \"global_savings_snapshots\".\"included_chain_count\" >= 0\n        and \"global_savings_snapshots\".\"included_chain_count\" <= \"global_savings_snapshots\".\"expected_chain_count\""
+        },
+        "global_savings_snapshots_amounts_check": {
+          "name": "global_savings_snapshots_amounts_check",
+          "value": "\"global_savings_snapshots\".\"usdp_supply_on_savings_chains\" ~ '^[0-9]+$'\n        and \"global_savings_snapshots\".\"susdp_total_assets\" ~ '^[0-9]+$'\n        and \"global_savings_snapshots\".\"susdp_total_supply\" ~ '^[0-9]+$'\n        and (\"global_savings_snapshots\".\"susdp_weighted_estimated_apy\" is null\n          or \"global_savings_snapshots\".\"susdp_weighted_estimated_apy\" ~ '^[0-9]+$')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.global_savings_yield_aggregates": {
+      "name": "global_savings_yield_aggregates",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "window_start": {
+          "name": "window_start",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "window_end": {
+          "name": "window_end",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expected_chain_count": {
+          "name": "expected_chain_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "included_chain_count": {
+          "name": "included_chain_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "coverage_status": {
+          "name": "coverage_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "native_ypo": {
+          "name": "native_ypo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "included_chain_ids": {
+          "name": "included_chain_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "missing_chain_ids": {
+          "name": "missing_chain_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "unreconciled_chain_ids": {
+          "name": "unreconciled_chain_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "calculation_version": {
+          "name": "calculation_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "global_savings_yield_window_version_unique": {
+          "name": "global_savings_yield_window_version_unique",
+          "columns": [
+            {
+              "expression": "window_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "window_end",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "calculation_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "global_savings_yield_window_idx": {
+          "name": "global_savings_yield_window_idx",
+          "columns": [
+            {
+              "expression": "window_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "window_end",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "global_savings_yield_window_check": {
+          "name": "global_savings_yield_window_check",
+          "value": "\"global_savings_yield_aggregates\".\"window_end\" > \"global_savings_yield_aggregates\".\"window_start\""
+        },
+        "global_savings_yield_status_check": {
+          "name": "global_savings_yield_status_check",
+          "value": "\"global_savings_yield_aggregates\".\"coverage_status\" in ('complete', 'partial', 'unavailable')"
+        },
+        "global_savings_yield_counts_check": {
+          "name": "global_savings_yield_counts_check",
+          "value": "\"global_savings_yield_aggregates\".\"expected_chain_count\" >= 0\n        and \"global_savings_yield_aggregates\".\"included_chain_count\" >= 0\n        and \"global_savings_yield_aggregates\".\"included_chain_count\" <= \"global_savings_yield_aggregates\".\"expected_chain_count\""
+        },
+        "global_savings_yield_amount_check": {
+          "name": "global_savings_yield_amount_check",
+          "value": "\"global_savings_yield_aggregates\".\"native_ypo\" ~ '^[0-9]+$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.global_savings_yield_components": {
+      "name": "global_savings_yield_components",
+      "schema": "",
+      "columns": {
+        "global_yield_id": {
+          "name": "global_yield_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "savings_yield_id": {
+          "name": "savings_yield_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "global_savings_yield_component_chain_unique": {
+          "name": "global_savings_yield_component_chain_unique",
+          "columns": [
+            {
+              "expression": "global_yield_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "global_savings_yield_components_global_yield_id_global_savings_yield_aggregates_id_fk": {
+          "name": "global_savings_yield_components_global_yield_id_global_savings_yield_aggregates_id_fk",
+          "tableFrom": "global_savings_yield_components",
+          "tableTo": "global_savings_yield_aggregates",
+          "columnsFrom": [
+            "global_yield_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "global_savings_yield_components_savings_yield_id_savings_yield_aggregates_id_fk": {
+          "name": "global_savings_yield_components_savings_yield_id_savings_yield_aggregates_id_fk",
+          "tableFrom": "global_savings_yield_components",
+          "tableTo": "savings_yield_aggregates",
+          "columnsFrom": [
+            "savings_yield_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "global_savings_yield_components_global_yield_id_savings_yield_id_pk": {
+          "name": "global_savings_yield_components_global_yield_id_savings_yield_id_pk",
+          "columns": [
+            "global_yield_id",
+            "savings_yield_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.indexer_checkpoints": {
+      "name": "indexer_checkpoints",
+      "schema": "",
+      "columns": {
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "next_block": {
+          "name": "next_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_completed_block": {
+          "name": "last_completed_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_completed_block_hash": {
+          "name": "last_completed_block_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "manifest_id": {
+          "name": "manifest_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "indexer_checkpoints_manifest_id_contract_manifests_id_fk": {
+          "name": "indexer_checkpoints_manifest_id_contract_manifests_id_fk",
+          "tableFrom": "indexer_checkpoints",
+          "tableTo": "contract_manifests",
+          "columnsFrom": [
+            "manifest_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "indexer_checkpoints_chain_id_scope_pk": {
+          "name": "indexer_checkpoints_chain_id_scope_pk",
+          "columns": [
+            "chain_id",
+            "scope"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.indexer_coverage": {
+      "name": "indexer_coverage",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "from_block": {
+          "name": "from_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "to_block": {
+          "name": "to_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scanned_at": {
+          "name": "scanned_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "indexer_coverage_scope_range_unique": {
+          "name": "indexer_coverage_scope_range_unique",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "scope",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "from_block",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "to_block",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "indexer_coverage_scope_from_idx": {
+          "name": "indexer_coverage_scope_from_idx",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "scope",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "from_block",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "indexer_coverage_run_id_indexer_runs_id_fk": {
+          "name": "indexer_coverage_run_id_indexer_runs_id_fk",
+          "tableFrom": "indexer_coverage",
+          "tableTo": "indexer_runs",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "indexer_coverage_range_check": {
+          "name": "indexer_coverage_range_check",
+          "value": "\"indexer_coverage\".\"to_block\" >= \"indexer_coverage\".\"from_block\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.indexer_runs": {
+      "name": "indexer_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "run_type": {
+          "name": "run_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "from_block": {
+          "name": "from_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "to_block": {
+          "name": "to_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'running'"
+        },
+        "counters": {
+          "name": "counters",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "failure": {
+          "name": "failure",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "indexer_runs_chain_started_idx": {
+          "name": "indexer_runs_chain_started_idx",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "started_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "indexer_runs_status_check": {
+          "name": "indexer_runs_status_check",
+          "value": "\"indexer_runs\".\"status\" in ('running', 'completed', 'failed', 'interrupted')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.price_observations": {
+      "name": "price_observations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asset_address": {
+          "name": "asset_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_number": {
+          "name": "block_number",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "observed_at": {
+          "name": "observed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_usd_atomic": {
+          "name": "price_usd_atomic",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_decimals": {
+          "name": "price_decimals",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_metadata": {
+          "name": "source_metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "stale": {
+          "name": "stale",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "calculation_version": {
+          "name": "calculation_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "price_observations_asset_block_source_unique": {
+          "name": "price_observations_asset_block_source_unique",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "asset_address",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "block_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "source",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "price_observations_block_fk": {
+          "name": "price_observations_block_fk",
+          "tableFrom": "price_observations",
+          "tableTo": "blocks",
+          "columnsFrom": [
+            "chain_id",
+            "block_number"
+          ],
+          "columnsTo": [
+            "chain_id",
+            "number"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "price_observations_decimals_check": {
+          "name": "price_observations_decimals_check",
+          "value": "\"price_observations\".\"price_decimals\" between 0 and 36"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.protocol_events": {
+      "name": "protocol_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "raw_log_id": {
+          "name": "raw_log_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_number": {
+          "name": "block_number",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transaction_hash": {
+          "name": "transaction_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "log_index": {
+          "name": "log_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contract_role": {
+          "name": "contract_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_name": {
+          "name": "event_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "decoder_version": {
+          "name": "decoder_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "protocol_events_raw_log_unique": {
+          "name": "protocol_events_raw_log_unique",
+          "columns": [
+            {
+              "expression": "raw_log_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "protocol_events_chain_block_idx": {
+          "name": "protocol_events_chain_block_idx",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "block_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "protocol_events_name_block_idx": {
+          "name": "protocol_events_name_block_idx",
+          "columns": [
+            {
+              "expression": "event_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "block_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "protocol_events_raw_log_id_raw_logs_id_fk": {
+          "name": "protocol_events_raw_log_id_raw_logs_id_fk",
+          "tableFrom": "protocol_events",
+          "tableTo": "raw_logs",
+          "columnsFrom": [
+            "raw_log_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.raw_logs": {
+      "name": "raw_logs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_number": {
+          "name": "block_number",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_hash": {
+          "name": "block_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transaction_hash": {
+          "name": "transaction_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "transaction_index": {
+          "name": "transaction_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "log_index": {
+          "name": "log_index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contract_address": {
+          "name": "contract_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "topics": {
+          "name": "topics",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "data": {
+          "name": "data",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "removed": {
+          "name": "removed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "decoder_version": {
+          "name": "decoder_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inserted_at": {
+          "name": "inserted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "raw_logs_chain_tx_log_unique": {
+          "name": "raw_logs_chain_tx_log_unique",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "transaction_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "log_index",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "raw_logs_chain_block_idx": {
+          "name": "raw_logs_chain_block_idx",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "block_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "raw_logs_contract_block_idx": {
+          "name": "raw_logs_contract_block_idx",
+          "columns": [
+            {
+              "expression": "contract_address",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "block_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "raw_logs_run_id_indexer_runs_id_fk": {
+          "name": "raw_logs_run_id_indexer_runs_id_fk",
+          "tableFrom": "raw_logs",
+          "tableTo": "indexer_runs",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "raw_logs_block_fk": {
+          "name": "raw_logs_block_fk",
+          "tableFrom": "raw_logs",
+          "tableTo": "blocks",
+          "columnsFrom": [
+            "chain_id",
+            "block_number"
+          ],
+          "columnsTo": [
+            "chain_id",
+            "number"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "raw_logs_contract_address_check": {
+          "name": "raw_logs_contract_address_check",
+          "value": "\"raw_logs\".\"contract_address\" ~ '^0x[0-9a-f]{40}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.savings_chain_snapshots": {
+      "name": "savings_chain_snapshots",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_number": {
+          "name": "block_number",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_hash": {
+          "name": "block_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_timestamp": {
+          "name": "block_timestamp",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usdp_snapshot_id": {
+          "name": "usdp_snapshot_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_snapshot_id": {
+          "name": "susdp_snapshot_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_total_assets": {
+          "name": "susdp_total_assets",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_actual_assets": {
+          "name": "susdp_actual_assets",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_pending_yield": {
+          "name": "susdp_pending_yield",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_share_price_usdp": {
+          "name": "susdp_share_price_usdp",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_rate": {
+          "name": "susdp_rate",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_last_update": {
+          "name": "susdp_last_update",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_estimated_apy": {
+          "name": "susdp_estimated_apy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_max_rate": {
+          "name": "susdp_max_rate",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_pause_state": {
+          "name": "susdp_pause_state",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usdp_implementation": {
+          "name": "usdp_implementation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_implementation": {
+          "name": "susdp_implementation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asset_relationship_verified": {
+          "name": "asset_relationship_verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_status": {
+          "name": "snapshot_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "manifest_version": {
+          "name": "manifest_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "calculation_version": {
+          "name": "calculation_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "savings_chain_snapshots_provenance_unique": {
+          "name": "savings_chain_snapshots_provenance_unique",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "block_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "manifest_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "calculation_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "savings_chain_snapshots_latest_idx": {
+          "name": "savings_chain_snapshots_latest_idx",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "block_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "savings_chain_snapshots_usdp_snapshot_id_asset_chain_snapshots_id_fk": {
+          "name": "savings_chain_snapshots_usdp_snapshot_id_asset_chain_snapshots_id_fk",
+          "tableFrom": "savings_chain_snapshots",
+          "tableTo": "asset_chain_snapshots",
+          "columnsFrom": [
+            "usdp_snapshot_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "savings_chain_snapshots_susdp_snapshot_id_asset_chain_snapshots_id_fk": {
+          "name": "savings_chain_snapshots_susdp_snapshot_id_asset_chain_snapshots_id_fk",
+          "tableFrom": "savings_chain_snapshots",
+          "tableTo": "asset_chain_snapshots",
+          "columnsFrom": [
+            "susdp_snapshot_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "savings_chain_snapshots_block_fk": {
+          "name": "savings_chain_snapshots_block_fk",
+          "tableFrom": "savings_chain_snapshots",
+          "tableTo": "blocks",
+          "columnsFrom": [
+            "chain_id",
+            "block_number"
+          ],
+          "columnsTo": [
+            "chain_id",
+            "number"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "savings_chain_snapshots_status_check": {
+          "name": "savings_chain_snapshots_status_check",
+          "value": "\"savings_chain_snapshots\".\"snapshot_status\" in ('candidate', 'verified', 'invalid')"
+        },
+        "savings_chain_snapshots_amounts_check": {
+          "name": "savings_chain_snapshots_amounts_check",
+          "value": "\"savings_chain_snapshots\".\"susdp_total_assets\" ~ '^[0-9]+$'\n        and \"savings_chain_snapshots\".\"susdp_actual_assets\" ~ '^[0-9]+$'\n        and \"savings_chain_snapshots\".\"susdp_pending_yield\" ~ '^[0-9]+$'\n        and \"savings_chain_snapshots\".\"susdp_share_price_usdp\" ~ '^[0-9]+$'\n        and \"savings_chain_snapshots\".\"susdp_rate\" ~ '^[0-9]+$'\n        and \"savings_chain_snapshots\".\"susdp_estimated_apy\" ~ '^[0-9]+$'\n        and \"savings_chain_snapshots\".\"susdp_max_rate\" ~ '^[0-9]+$'"
+        },
+        "savings_chain_snapshots_pause_check": {
+          "name": "savings_chain_snapshots_pause_check",
+          "value": "\"savings_chain_snapshots\".\"susdp_pause_state\" between 0 and 255"
+        },
+        "savings_chain_snapshots_usdp_impl_check": {
+          "name": "savings_chain_snapshots_usdp_impl_check",
+          "value": "\"savings_chain_snapshots\".\"usdp_implementation\" ~ '^0x[0-9a-f]{40}$'"
+        },
+        "savings_chain_snapshots_susdp_impl_check": {
+          "name": "savings_chain_snapshots_susdp_impl_check",
+          "value": "\"savings_chain_snapshots\".\"susdp_implementation\" ~ '^0x[0-9a-f]{40}$'"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.savings_yield_aggregates": {
+      "name": "savings_yield_aggregates",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "start_snapshot_id": {
+          "name": "start_snapshot_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end_snapshot_id": {
+          "name": "end_snapshot_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "from_block": {
+          "name": "from_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "to_block": {
+          "name": "to_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "window_start": {
+          "name": "window_start",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "window_end": {
+          "name": "window_end",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accrued_interest": {
+          "name": "accrued_interest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pending_yield_at_start": {
+          "name": "pending_yield_at_start",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pending_yield_at_end": {
+          "name": "pending_yield_at_end",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "native_ypo": {
+          "name": "native_ypo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "coverage_scope": {
+          "name": "coverage_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "window_convention": {
+          "name": "window_convention",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reconciliation_status": {
+          "name": "reconciliation_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "manifest_version": {
+          "name": "manifest_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "calculation_version": {
+          "name": "calculation_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "savings_yield_provenance_range_unique": {
+          "name": "savings_yield_provenance_range_unique",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "from_block",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "to_block",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "manifest_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "calculation_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "savings_yield_chain_window_idx": {
+          "name": "savings_yield_chain_window_idx",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "window_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "window_end",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "savings_yield_aggregates_start_snapshot_id_savings_chain_snapshots_id_fk": {
+          "name": "savings_yield_aggregates_start_snapshot_id_savings_chain_snapshots_id_fk",
+          "tableFrom": "savings_yield_aggregates",
+          "tableTo": "savings_chain_snapshots",
+          "columnsFrom": [
+            "start_snapshot_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "savings_yield_aggregates_end_snapshot_id_savings_chain_snapshots_id_fk": {
+          "name": "savings_yield_aggregates_end_snapshot_id_savings_chain_snapshots_id_fk",
+          "tableFrom": "savings_yield_aggregates",
+          "tableTo": "savings_chain_snapshots",
+          "columnsFrom": [
+            "end_snapshot_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "savings_yield_range_check": {
+          "name": "savings_yield_range_check",
+          "value": "\"savings_yield_aggregates\".\"to_block\" > \"savings_yield_aggregates\".\"from_block\""
+        },
+        "savings_yield_window_check": {
+          "name": "savings_yield_window_check",
+          "value": "\"savings_yield_aggregates\".\"window_end\" > \"savings_yield_aggregates\".\"window_start\""
+        },
+        "savings_yield_amounts_check": {
+          "name": "savings_yield_amounts_check",
+          "value": "\"savings_yield_aggregates\".\"accrued_interest\" ~ '^[0-9]+$'\n        and \"savings_yield_aggregates\".\"pending_yield_at_start\" ~ '^[0-9]+$'\n        and \"savings_yield_aggregates\".\"pending_yield_at_end\" ~ '^[0-9]+$'\n        and \"savings_yield_aggregates\".\"native_ypo\" ~ '^[0-9]+$'"
+        },
+        "savings_yield_reconciliation_status_check": {
+          "name": "savings_yield_reconciliation_status_check",
+          "value": "\"savings_yield_aggregates\".\"reconciliation_status\" in ('candidate', 'verified', 'invalid')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.vault_snapshots": {
+      "name": "vault_snapshots",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_number": {
+          "name": "block_number",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_hash": {
+          "name": "block_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "block_timestamp": {
+          "name": "block_timestamp",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "finalized": {
+          "name": "finalized",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usdp_total_supply": {
+          "name": "usdp_total_supply",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_total_assets": {
+          "name": "susdp_total_assets",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_actual_assets": {
+          "name": "susdp_actual_assets",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_total_supply": {
+          "name": "susdp_total_supply",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_pending_yield": {
+          "name": "susdp_pending_yield",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_share_price_usdp": {
+          "name": "susdp_share_price_usdp",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_rate": {
+          "name": "susdp_rate",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_last_update": {
+          "name": "susdp_last_update",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_estimated_apr": {
+          "name": "susdp_estimated_apr",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_max_rate": {
+          "name": "susdp_max_rate",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_pause_state": {
+          "name": "susdp_pause_state",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usdp_implementation": {
+          "name": "usdp_implementation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_implementation": {
+          "name": "susdp_implementation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usdp_price_observation_id": {
+          "name": "usdp_price_observation_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "susdp_price_observation_id": {
+          "name": "susdp_price_observation_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_status": {
+          "name": "snapshot_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "manifest_version": {
+          "name": "manifest_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "calculation_version": {
+          "name": "calculation_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "vault_snapshots_provenance_block_unique": {
+          "name": "vault_snapshots_provenance_block_unique",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "block_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "manifest_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "calculation_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "vault_snapshots_chain_block_idx": {
+          "name": "vault_snapshots_chain_block_idx",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "block_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "vault_snapshots_usdp_price_observation_id_price_observations_id_fk": {
+          "name": "vault_snapshots_usdp_price_observation_id_price_observations_id_fk",
+          "tableFrom": "vault_snapshots",
+          "tableTo": "price_observations",
+          "columnsFrom": [
+            "usdp_price_observation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "vault_snapshots_susdp_price_observation_id_price_observations_id_fk": {
+          "name": "vault_snapshots_susdp_price_observation_id_price_observations_id_fk",
+          "tableFrom": "vault_snapshots",
+          "tableTo": "price_observations",
+          "columnsFrom": [
+            "susdp_price_observation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "vault_snapshots_status_check": {
+          "name": "vault_snapshots_status_check",
+          "value": "\"vault_snapshots\".\"snapshot_status\" in ('candidate', 'verified', 'invalid')"
+        },
+        "vault_snapshots_amounts_check": {
+          "name": "vault_snapshots_amounts_check",
+          "value": "\"vault_snapshots\".\"usdp_total_supply\" ~ '^[0-9]+$'\n        and \"vault_snapshots\".\"susdp_total_assets\" ~ '^[0-9]+$'\n        and \"vault_snapshots\".\"susdp_actual_assets\" ~ '^[0-9]+$'\n        and \"vault_snapshots\".\"susdp_total_supply\" ~ '^[0-9]+$'\n        and \"vault_snapshots\".\"susdp_pending_yield\" ~ '^[0-9]+$'\n        and \"vault_snapshots\".\"susdp_share_price_usdp\" ~ '^[0-9]+$'\n        and \"vault_snapshots\".\"susdp_rate\" ~ '^[0-9]+$'\n        and \"vault_snapshots\".\"susdp_estimated_apr\" ~ '^[0-9]+$'\n        and \"vault_snapshots\".\"susdp_max_rate\" ~ '^[0-9]+$'"
+        },
+        "vault_snapshots_pause_check": {
+          "name": "vault_snapshots_pause_check",
+          "value": "\"vault_snapshots\".\"susdp_pause_state\" between 0 and 255"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.yield_aggregates": {
+      "name": "yield_aggregates",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "start_snapshot_id": {
+          "name": "start_snapshot_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "end_snapshot_id": {
+          "name": "end_snapshot_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "from_block": {
+          "name": "from_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "to_block": {
+          "name": "to_block",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accrued_interest": {
+          "name": "accrued_interest",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pending_yield_at_start": {
+          "name": "pending_yield_at_start",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pending_yield_at_end": {
+          "name": "pending_yield_at_end",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "native_ypo": {
+          "name": "native_ypo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "window_convention": {
+          "name": "window_convention",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "manifest_version": {
+          "name": "manifest_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "calculation_version": {
+          "name": "calculation_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "yield_aggregates_provenance_range_unique": {
+          "name": "yield_aggregates_provenance_range_unique",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "from_block",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "to_block",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "manifest_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "calculation_version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "yield_aggregates_chain_range_idx": {
+          "name": "yield_aggregates_chain_range_idx",
+          "columns": [
+            {
+              "expression": "chain_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "from_block",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "to_block",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "yield_aggregates_start_snapshot_id_vault_snapshots_id_fk": {
+          "name": "yield_aggregates_start_snapshot_id_vault_snapshots_id_fk",
+          "tableFrom": "yield_aggregates",
+          "tableTo": "vault_snapshots",
+          "columnsFrom": [
+            "start_snapshot_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "yield_aggregates_end_snapshot_id_vault_snapshots_id_fk": {
+          "name": "yield_aggregates_end_snapshot_id_vault_snapshots_id_fk",
+          "tableFrom": "yield_aggregates",
+          "tableTo": "vault_snapshots",
+          "columnsFrom": [
+            "end_snapshot_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "yield_aggregates_range_check": {
+          "name": "yield_aggregates_range_check",
+          "value": "\"yield_aggregates\".\"to_block\" > \"yield_aggregates\".\"from_block\""
+        },
+        "yield_aggregates_amounts_check": {
+          "name": "yield_aggregates_amounts_check",
+          "value": "\"yield_aggregates\".\"accrued_interest\" ~ '^[0-9]+$'\n        and \"yield_aggregates\".\"pending_yield_at_start\" ~ '^[0-9]+$'\n        and \"yield_aggregates\".\"pending_yield_at_end\" ~ '^[0-9]+$'\n        and \"yield_aggregates\".\"native_ypo\" ~ '^[0-9]+$'"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

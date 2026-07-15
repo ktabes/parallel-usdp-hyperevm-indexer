@@ -1,5 +1,5 @@
 import { getAddress, isAddress } from "viem";
-import { hyperevmProtocol } from "@/protocol/hyperevm";
+import { findParallelDeployment } from "@/protocol/assets";
 
 export const FLOW_CALCULATION_VERSION = "parallel-usdp-flows-v1-candidate";
 
@@ -117,25 +117,32 @@ function baseClassification(
 }
 
 function classifyEvent(event: ProtocolEventInput) {
+  const usdpDeployment = findParallelDeployment("usdp", event.chainId);
+  const susdpDeployment = findParallelDeployment("susdp", event.chainId);
+  if (!usdpDeployment || !susdpDeployment)
+    throw new Error(`Missing savings deployment for chain ${event.chainId}`);
+  const usdp = usdpDeployment.address.toLowerCase();
+  const susdp = susdpDeployment.address.toLowerCase();
+
   if (event.contractRole === "susdp-savings") {
     if (event.eventName === "Deposit")
       return baseClassification(event, "susdp_deposited", {
         amountBaseUnits: unsignedAmount(event.payload, "assets"),
-        assetAddress: hyperevmProtocol.contracts.usdp.address.toLowerCase(),
+        assetAddress: usdp,
         primaryParticipant: normalizedAddress(event.payload, "owner"),
         secondaryParticipant: normalizedAddress(event.payload, "sender"),
       });
     if (event.eventName === "Withdraw")
       return baseClassification(event, "susdp_withdrawn", {
         amountBaseUnits: unsignedAmount(event.payload, "assets"),
-        assetAddress: hyperevmProtocol.contracts.usdp.address.toLowerCase(),
+        assetAddress: usdp,
         primaryParticipant: normalizedAddress(event.payload, "owner"),
         secondaryParticipant: normalizedAddress(event.payload, "receiver"),
       });
     if (event.eventName === "Accrued")
       return baseClassification(event, "susdp_accrued", {
         amountBaseUnits: unsignedAmount(event.payload, "interest"),
-        assetAddress: hyperevmProtocol.contracts.usdp.address.toLowerCase(),
+        assetAddress: usdp,
       });
     if (event.eventName === "RateUpdated")
       return baseClassification(event, "susdp_rate_updated", {
@@ -152,7 +159,7 @@ function classifyEvent(event: ProtocolEventInput) {
     if (event.eventName === "Transfer")
       return baseClassification(event, "susdp_transfer", {
         amountBaseUnits: unsignedAmount(event.payload, "value"),
-        assetAddress: hyperevmProtocol.contracts.susdp.address.toLowerCase(),
+        assetAddress: susdp,
         primaryParticipant: normalizedAddress(event.payload, "from"),
         secondaryParticipant: normalizedAddress(event.payload, "to"),
       });
@@ -161,7 +168,7 @@ function classifyEvent(event: ProtocolEventInput) {
   if (event.contractRole === "usdp-token" && event.eventName === "Transfer")
     return baseClassification(event, "usdp_transfer", {
       amountBaseUnits: unsignedAmount(event.payload, "value"),
-      assetAddress: hyperevmProtocol.contracts.usdp.address.toLowerCase(),
+      assetAddress: usdp,
       primaryParticipant: normalizedAddress(event.payload, "from"),
       secondaryParticipant: normalizedAddress(event.payload, "to"),
     });
@@ -170,7 +177,6 @@ function classifyEvent(event: ProtocolEventInput) {
     if (event.eventName === "Swap") {
       const tokenIn = normalizedAddress(event.payload, "tokenIn");
       const tokenOut = normalizedAddress(event.payload, "tokenOut");
-      const usdp = hyperevmProtocol.contracts.usdp.address.toLowerCase();
       const isIssue = tokenOut === usdp;
       const isBurn = tokenIn === usdp;
       if (isIssue && isBurn)
@@ -199,7 +205,7 @@ function classifyEvent(event: ProtocolEventInput) {
     if (event.eventName === "Redeemed")
       return baseClassification(event, "usdp_redeemed", {
         amountBaseUnits: unsignedAmount(event.payload, "amount"),
-        assetAddress: hyperevmProtocol.contracts.usdp.address.toLowerCase(),
+        assetAddress: usdp,
         primaryParticipant: normalizedAddress(event.payload, "from"),
         secondaryParticipant: normalizedAddress(event.payload, "to"),
       });

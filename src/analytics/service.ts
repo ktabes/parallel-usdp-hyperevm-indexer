@@ -8,6 +8,7 @@ import {
 } from "./economic-events";
 import { verifyCoverage } from "@/indexer/status";
 import { hyperevmProtocol } from "@/protocol/hyperevm";
+import { savingsChainAdapters } from "@/protocol/savings-chains";
 
 interface ProtocolEventRow {
   id: string;
@@ -26,6 +27,7 @@ export interface RebuildFlowAnalyticsOptions {
   scope: string;
   fromBlock: bigint;
   toBlock: bigint;
+  chainId?: number;
   manifestVersion?: string;
   calculationVersion?: string;
 }
@@ -33,11 +35,13 @@ export interface RebuildFlowAnalyticsOptions {
 export async function rebuildFlowAnalytics(
   options: RebuildFlowAnalyticsOptions,
 ) {
+  const chainId = options.chainId ?? hyperevmProtocol.chainId;
   const coverage = await verifyCoverage(
     options.pool,
     options.scope,
     options.fromBlock,
     options.toBlock,
+    chainId,
   );
   if (!coverage.complete)
     return {
@@ -47,7 +51,10 @@ export async function rebuildFlowAnalytics(
     };
 
   const manifestVersion =
-    options.manifestVersion ?? hyperevmProtocol.manifestVersion;
+    options.manifestVersion ??
+    savingsChainAdapters.find((adapter) => adapter.chainId === chainId)
+      ?.manifestVersion ??
+    hyperevmProtocol.manifestVersion;
   const calculationVersion =
     options.calculationVersion ?? FLOW_CALCULATION_VERSION;
   const rows = await options.pool.query<ProtocolEventRow>(
@@ -59,11 +66,7 @@ export async function rebuildFlowAnalytics(
          on b.chain_id = pe.chain_id and b.number = pe.block_number
       where pe.chain_id = $1 and pe.block_number between $2 and $3
       order by pe.transaction_hash, pe.log_index`,
-    [
-      hyperevmProtocol.chainId,
-      options.fromBlock.toString(),
-      options.toBlock.toString(),
-    ],
+    [chainId, options.fromBlock.toString(), options.toBlock.toString()],
   );
   const sourceEvents: ProtocolEventInput[] = rows.rows.map((row) => ({
     id: row.id,
@@ -91,7 +94,7 @@ export async function rebuildFlowAnalytics(
         where chain_id = $1 and source_from_block = $2 and source_to_block = $3
           and manifest_version = $4 and calculation_version = $5`,
       [
-        hyperevmProtocol.chainId,
+        chainId,
         options.fromBlock.toString(),
         options.toBlock.toString(),
         manifestVersion,
@@ -151,7 +154,7 @@ export async function rebuildFlowAnalytics(
            source_to_block, manifest_version, calculation_version)
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
         [
-          hyperevmProtocol.chainId,
+          chainId,
           aggregate.granularity,
           aggregate.bucketStart,
           aggregate.metric,

@@ -758,3 +758,142 @@ export const yieldAggregates = pgTable(
     ),
   ],
 );
+
+export const savingsYieldAggregates = pgTable(
+  "savings_yield_aggregates",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    startSnapshotId: bigint("start_snapshot_id", { mode: "bigint" })
+      .notNull()
+      .references(() => savingsChainSnapshots.id, { onDelete: "restrict" }),
+    endSnapshotId: bigint("end_snapshot_id", { mode: "bigint" })
+      .notNull()
+      .references(() => savingsChainSnapshots.id, { onDelete: "restrict" }),
+    fromBlock: bigint("from_block", { mode: "bigint" }).notNull(),
+    toBlock: bigint("to_block", { mode: "bigint" }).notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    windowEnd: timestamp("window_end", { withTimezone: true }).notNull(),
+    accruedInterest: text("accrued_interest").notNull(),
+    pendingYieldAtStart: text("pending_yield_at_start").notNull(),
+    pendingYieldAtEnd: text("pending_yield_at_end").notNull(),
+    nativeYpo: text("native_ypo").notNull(),
+    coverageScope: text("coverage_scope").notNull(),
+    windowConvention: text("window_convention").notNull(),
+    reconciliationStatus: text("reconciliation_status").notNull(),
+    manifestVersion: text("manifest_version").notNull(),
+    calculationVersion: text("calculation_version").notNull(),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("savings_yield_provenance_range_unique").on(
+      table.chainId,
+      table.fromBlock,
+      table.toBlock,
+      table.manifestVersion,
+      table.calculationVersion,
+    ),
+    index("savings_yield_chain_window_idx").on(
+      table.chainId,
+      table.windowStart,
+      table.windowEnd,
+    ),
+    check(
+      "savings_yield_range_check",
+      sql`${table.toBlock} > ${table.fromBlock}`,
+    ),
+    check(
+      "savings_yield_window_check",
+      sql`${table.windowEnd} > ${table.windowStart}`,
+    ),
+    check(
+      "savings_yield_amounts_check",
+      sql`${table.accruedInterest} ~ '^[0-9]+$'
+        and ${table.pendingYieldAtStart} ~ '^[0-9]+$'
+        and ${table.pendingYieldAtEnd} ~ '^[0-9]+$'
+        and ${table.nativeYpo} ~ '^[0-9]+$'`,
+    ),
+    check(
+      "savings_yield_reconciliation_status_check",
+      sql`${table.reconciliationStatus} in ('candidate', 'verified', 'invalid')`,
+    ),
+  ],
+);
+
+export const globalSavingsYieldAggregates = pgTable(
+  "global_savings_yield_aggregates",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    windowEnd: timestamp("window_end", { withTimezone: true }).notNull(),
+    expectedChainCount: integer("expected_chain_count").notNull(),
+    includedChainCount: integer("included_chain_count").notNull(),
+    coverageStatus: text("coverage_status").notNull(),
+    nativeYpo: text("native_ypo").notNull(),
+    includedChainIds: jsonb("included_chain_ids")
+      .$type<number[]>()
+      .notNull()
+      .default([]),
+    missingChainIds: jsonb("missing_chain_ids")
+      .$type<number[]>()
+      .notNull()
+      .default([]),
+    unreconciledChainIds: jsonb("unreconciled_chain_ids")
+      .$type<number[]>()
+      .notNull()
+      .default([]),
+    calculationVersion: text("calculation_version").notNull(),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("global_savings_yield_window_version_unique").on(
+      table.windowStart,
+      table.windowEnd,
+      table.calculationVersion,
+    ),
+    index("global_savings_yield_window_idx").on(
+      table.windowStart,
+      table.windowEnd,
+    ),
+    check(
+      "global_savings_yield_window_check",
+      sql`${table.windowEnd} > ${table.windowStart}`,
+    ),
+    check(
+      "global_savings_yield_status_check",
+      sql`${table.coverageStatus} in ('complete', 'partial', 'unavailable')`,
+    ),
+    check(
+      "global_savings_yield_counts_check",
+      sql`${table.expectedChainCount} >= 0
+        and ${table.includedChainCount} >= 0
+        and ${table.includedChainCount} <= ${table.expectedChainCount}`,
+    ),
+    check(
+      "global_savings_yield_amount_check",
+      sql`${table.nativeYpo} ~ '^[0-9]+$'`,
+    ),
+  ],
+);
+
+export const globalSavingsYieldComponents = pgTable(
+  "global_savings_yield_components",
+  {
+    globalYieldId: bigint("global_yield_id", { mode: "bigint" })
+      .notNull()
+      .references(() => globalSavingsYieldAggregates.id, {
+        onDelete: "cascade",
+      }),
+    savingsYieldId: bigint("savings_yield_id", { mode: "bigint" })
+      .notNull()
+      .references(() => savingsYieldAggregates.id, { onDelete: "restrict" }),
+    chainId: integer("chain_id").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.globalYieldId, table.savingsYieldId] }),
+    uniqueIndex("global_savings_yield_component_chain_unique").on(
+      table.globalYieldId,
+      table.chainId,
+    ),
+  ],
+);

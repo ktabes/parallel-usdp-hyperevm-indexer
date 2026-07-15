@@ -50,6 +50,7 @@ export interface CaptureSavingsChainSnapshotOptions {
   finalityLag: number;
   requestIntervalMs?: number;
   calculationVersion?: string;
+  blockNumber?: bigint;
 }
 
 export async function syncParallelAssetRegistry(pool: Pool) {
@@ -238,11 +239,10 @@ export async function captureSavingsChainSnapshot(
   const client = createEvmClient(options.adapter.chain, options.rpcUrl, {
     minRequestIntervalMs: options.requestIntervalMs,
   });
-  const block = await finalizedBlock(
-    client,
-    options.adapter,
-    options.finalityLag,
-  );
+  const block =
+    options.blockNumber === undefined
+      ? await finalizedBlock(client, options.adapter, options.finalityLag)
+      : await client.getBlock({ blockNumber: options.blockNumber });
   if (block.number === null || !block.hash)
     throw new Error(
       `${options.adapter.chainName} finalized block is incomplete`,

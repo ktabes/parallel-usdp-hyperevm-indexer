@@ -33,10 +33,18 @@ The Phase 5 multichain migration adds normalized cross-chain identity and aggreg
 - `asset_deployments`: canonical asset ID, chain ID, contract address, deployment role, official-source attribution, manifest, and adapter status.
 - `asset_chain_snapshots`: finalized per-deployment token supply and price evidence.
 - `savings_chain_snapshots`: ERC-4626 state referencing the sUSDp deployment, underlying USDp deployment, and component price observations.
-- `global_asset_snapshots`: one asset-level calculation at an `as_of` timestamp with coverage, freshness, reconciliation, and calculation versions.
-- `global_asset_snapshot_components`: exact links from a global result to each chain snapshot used in it.
+- `global_savings_snapshots`: one asset-level savings calculation at an `as_of` timestamp with coverage, freshness, and calculation versions.
+- `global_savings_snapshot_components`: exact links from a global result to each chain snapshot used in it.
 
 The original `vault_snapshots` rows remain intact as the HyperEVM YPO foundation. New current-state captures write the normalized chain tables, including HyperEVM, without mutating that historical evidence. A global snapshot stores no opaque pre-summed number without component links. Different chains use independent block numbers and finality rules; only UTC component timestamps are aligned at the global layer.
+
+The Phase 6 historical migration adds normalized interval evidence:
+
+- `savings_yield_aggregates` links a chain-local YPO result to exact normalized start/end savings snapshots, complete log coverage, its UTC window, reconciliation state, manifest, and calculation version.
+- `global_savings_yield_aggregates` records an aligned UTC window, expected/included/unreconciled chains, and only the sum of verified component YPO.
+- `global_savings_yield_components` links every included global amount to its exact chain interval. Candidate or invalid chain intervals are never silently summed.
+
+The immutable `raw_logs`, `blocks`, `indexer_coverage`, and checkpoints remain shared across chains. Decoder identity is keyed by `(chain_id, contract_address)` because the same address can represent different Parallel contracts on different chains.
 
 ## Rules
 

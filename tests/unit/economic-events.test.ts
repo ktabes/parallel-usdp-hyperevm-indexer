@@ -6,6 +6,7 @@ import {
   type ProtocolEventInput,
 } from "@/analytics/economic-events";
 import { hyperevmProtocol } from "@/protocol/hyperevm";
+import { findParallelDeployment } from "@/protocol/assets";
 
 const zero = "0x0000000000000000000000000000000000000000";
 const alice = "0x1111111111111111111111111111111111111111";
@@ -19,7 +20,7 @@ function event(
 ): ProtocolEventInput {
   return {
     id: overrides.id ?? "1",
-    chainId: 999,
+    chainId: overrides.chainId ?? 999,
     blockNumber: overrides.blockNumber ?? "100",
     blockTimestamp:
       overrides.blockTimestamp ?? new Date("2026-07-15T10:30:00.000Z"),
@@ -34,6 +35,32 @@ function event(
 }
 
 describe("Phase 3 economic-event classification", () => {
+  it("uses the chain-local USDp address for savings flows", () => {
+    const baseUsdp = findParallelDeployment(
+      "usdp",
+      8453,
+    )!.address.toLowerCase();
+    const [classified] = classifyProtocolTransactions([
+      event({
+        chainId: 8453,
+        contractRole: "susdp-savings",
+        eventName: "Deposit",
+        payload: {
+          sender: router,
+          owner: alice,
+          assets: "1000",
+          shares: "950",
+        },
+      }),
+    ]);
+
+    expect(classified).toMatchObject({
+      classification: "susdp_deposited",
+      assetAddress: baseUsdp,
+      amountBaseUnits: "1000",
+    });
+  });
+
   it("counts a deposit once while retaining linked transfer evidence", () => {
     const classified = classifyProtocolTransactions([
       event({

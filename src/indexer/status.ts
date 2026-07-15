@@ -8,13 +8,14 @@ export async function verifyCoverage(
   scope: string,
   fromBlock: bigint,
   toBlock: bigint,
+  chainId = HYPEREVM_CHAIN_ID,
 ) {
   const result = await pool.query<{ from_block: string; to_block: string }>(
     `select from_block, to_block from indexer_coverage
      where chain_id = $1 and scope = $2
        and to_block >= $3 and from_block <= $4
      order by from_block`,
-    [HYPEREVM_CHAIN_ID, scope, fromBlock.toString(), toBlock.toString()],
+    [chainId, scope, fromBlock.toString(), toBlock.toString()],
   );
   const ranges: BlockRange[] = result.rows.map((row) => ({
     fromBlock: BigInt(row.from_block),
@@ -23,6 +24,7 @@ export async function verifyCoverage(
   const gaps = coverageGaps(ranges, fromBlock, toBlock);
   return {
     scope,
+    chainId,
     fromBlock: fromBlock.toString(),
     toBlock: toBlock.toString(),
     complete: gaps.length === 0,

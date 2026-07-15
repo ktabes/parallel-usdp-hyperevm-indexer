@@ -9,7 +9,16 @@ import {
 import { captureVaultSnapshot } from "@/analytics/snapshots";
 import { calculateYieldForRange } from "@/analytics/yield";
 import { readLatestGlobalSavings } from "@/analytics/global-queries";
+import { readLatestSavingsHistory } from "@/analytics/history-queries";
 import { captureConfiguredSavingsSnapshots } from "@/analytics/multichain-snapshots";
+import {
+  captureSavingsChainSnapshot,
+  syncParallelAssetRegistry,
+} from "@/analytics/multichain-snapshots";
+import {
+  resolveAlignedSavingsHistoryRanges,
+  runSavingsHistoryRange,
+} from "@/analytics/savings-history";
 import { createDatabase } from "@/db/client";
 import {
   DEFAULT_INDEXER_SCOPE,
@@ -41,6 +50,25 @@ function requiredArgument(name: string) {
 
 function indexerScope() {
   return argument("--scope") ?? DEFAULT_INDEXER_SCOPE;
+}
+
+function historyDays() {
+  const value = Number(argument("--days") ?? "7");
+  if (!Number.isInteger(value) || value < 1 || value > 365)
+    throw new Error("--days must be an integer between 1 and 365");
+  return value;
+}
+
+function requestedHistoryChains() {
+  const value =
+    argument("--chains") ??
+    argument("--chain") ??
+    "ethereum,base,sonic,avalanche";
+  const chains = [
+    ...new Set(value.split(",").map((item) => item.trim())),
+  ].filter(Boolean);
+  if (chains.length === 0) throw new Error("At least one chain is required");
+  return chains;
 }
 
 function progressReporter() {
@@ -330,6 +358,123 @@ async function captureMultichainSnapshots() {
   }
 }
 
+async function showSavingsHistoryPlan() {
+  const env = parseRuntimeEnv(process.env);
+  const ranges = await resolveAlignedSavingsHistoryRanges(
+    env,
+    requestedHistoryChains(),
+    historyDays(),
+  );
+  console.log(
+    JSON.stringify(
+      {
+        status: "planned",
+        days: historyDays(),
+        targetWindowStart: ranges[0]?.targetWindowStart.toString(),
+        targetWindowEnd: ranges[0]?.targetWindowEnd.toString(),
+        ranges: ranges.map((range) => ({
+          chainId: range.adapter.chainId,
+          chainSlug: range.adapter.chainSlug,
+          fromBlock: range.fromBlock.toString(),
+          toBlock: range.toBlock.toString(),
+          fromTimestamp: range.fromTimestamp.toString(),
+          toTimestamp: range.toTimestamp.toString(),
+          blockCount: (range.toBlock - range.fromBlock + 1n).toString(),
+        })),
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+async function captureSavingsHistoryBoundaries() {
+  const env = parseRuntimeEnv(process.env);
+  const ranges = await resolveAlignedSavingsHistoryRanges(
+    env,
+    requestedHistoryChains(),
+    historyDays(),
+  );
+  const { pool } = createDatabase(env);
+  try {
+    await syncParallelAssetRegistry(pool);
+    const results = [];
+    for (const range of ranges) {
+      const start = await captureSavingsChainSnapshot({
+        pool,
+        adapter: range.adapter,
+        rpcUrl: range.rpcUrl,
+        finalityLag: env.FINALITY_LAG,
+        requestIntervalMs: env.RPC_REQUEST_INTERVAL_MS,
+        blockNumber: range.fromBlock,
+      });
+      const end = await captureSavingsChainSnapshot({
+        pool,
+        adapter: range.adapter,
+        rpcUrl: range.rpcUrl,
+        finalityLag: env.FINALITY_LAG,
+        requestIntervalMs: env.RPC_REQUEST_INTERVAL_MS,
+        blockNumber: range.toBlock,
+      });
+      results.push({
+        chainId: range.adapter.chainId,
+        chainSlug: range.adapter.chainSlug,
+        start,
+        end,
+      });
+    }
+    console.log(JSON.stringify({ status: "candidate", results }, null, 2));
+  } finally {
+    await pool.end();
+  }
+}
+
+async function backfillSavingsHistory() {
+  const env = parseRuntimeEnv(process.env);
+  const ranges = await resolveAlignedSavingsHistoryRanges(
+    env,
+    requestedHistoryChains(),
+    historyDays(),
+  );
+  const chunkSizeValue = argument("--chunk-size");
+  const chunkSize = chunkSizeValue ? Number(chunkSizeValue) : undefined;
+  if (
+    chunkSize !== undefined &&
+    (!Number.isInteger(chunkSize) || chunkSize < 1 || chunkSize > 100_000)
+  )
+    throw new Error("--chunk-size must be an integer from 1 to 100000");
+  const { pool } = createDatabase(env);
+  try {
+    await syncParallelAssetRegistry(pool);
+    for (const range of ranges) {
+      console.log(
+        JSON.stringify({
+          status: "chain-started",
+          chainId: range.adapter.chainId,
+          chainSlug: range.adapter.chainSlug,
+          fromBlock: range.fromBlock.toString(),
+          toBlock: range.toBlock.toString(),
+        }),
+      );
+      console.log(
+        JSON.stringify(
+          await runSavingsHistoryRange({
+            pool,
+            env,
+            range,
+            chunkSize,
+            onProgress: progressReporter(),
+          }),
+          null,
+          2,
+        ),
+      );
+    }
+  } finally {
+    await pool.end();
+  }
+}
+
 async function showGlobalSavings() {
   const env = parseRuntimeEnv(process.env);
   const { pool } = createDatabase(env);
@@ -344,6 +489,16 @@ async function showGlobalSavings() {
         2,
       ),
     );
+  } finally {
+    await pool.end();
+  }
+}
+
+async function showSavingsHistory() {
+  const env = parseRuntimeEnv(process.env);
+  const { pool } = createDatabase(env);
+  try {
+    console.log(JSON.stringify(await readLatestSavingsHistory(pool), null, 2));
   } finally {
     await pool.end();
   }
@@ -426,6 +581,15 @@ async function main() {
     case "snapshot-all":
       await captureMultichainSnapshots();
       return;
+    case "history-plan":
+      await showSavingsHistoryPlan();
+      return;
+    case "history-boundaries":
+      await captureSavingsHistoryBoundaries();
+      return;
+    case "history-backfill":
+      await backfillSavingsHistory();
+      return;
     case "calculate-yield":
       await calculateYield();
       return;
@@ -438,9 +602,12 @@ async function main() {
     case "global":
       await showGlobalSavings();
       return;
+    case "history":
+      await showSavingsHistory();
+      return;
     default:
       throw new Error(
-        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|derive-flows|snapshot|snapshot-all|calculate-yield|state|yield|rates|price|global>",
+        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|derive-flows|snapshot|snapshot-all|history-plan|history-boundaries|history-backfill|calculate-yield|state|yield|rates|price|global|history>",
       );
   }
 }
