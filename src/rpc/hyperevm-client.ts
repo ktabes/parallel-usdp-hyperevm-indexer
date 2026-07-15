@@ -11,6 +11,7 @@ export const hyperevm = defineChain({
 
 export interface HyperevmClientOptions {
   minRequestIntervalMs?: number;
+  retryCount?: number;
 }
 
 function rateLimitedTransport(
@@ -43,7 +44,7 @@ export function createHyperevmClient(
 ) {
   const transport = http(rpcUrl, {
     timeout: 20_000,
-    retryCount: 2,
+    retryCount: options.retryCount ?? 2,
     retryDelay: 500,
   });
 

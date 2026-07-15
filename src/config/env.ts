@@ -35,6 +35,11 @@ export const runtimeEnvSchema = z.object({
     1,
     100_000,
   ).default(50),
+  RPC_REQUEST_INTERVAL_MS: integerFromString(
+    "RPC_REQUEST_INTERVAL_MS",
+    250,
+    60_000,
+  ).default(1_500),
   PRICE_SOURCE: z
     .enum(["unconfigured", "onchain", "external-comparison"])
     .default("unconfigured"),
@@ -53,6 +58,7 @@ export const discoveryEnvSchema = runtimeEnvSchema.pick({
   ONFINALITY_API_KEY: true,
   FINALITY_LAG: true,
   RPC_LOG_CHUNK_SIZE: true,
+  RPC_REQUEST_INTERVAL_MS: true,
 });
 
 export type DiscoveryEnv = z.infer<typeof discoveryEnvSchema>;

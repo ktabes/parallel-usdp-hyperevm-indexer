@@ -149,6 +149,8 @@ async function runIngestion(fromBlock: bigint, toBlock: bigint) {
       toBlock,
       finalityLag: env.FINALITY_LAG,
       chunkSize: env.RPC_LOG_CHUNK_SIZE,
+      requestIntervalMs: env.RPC_REQUEST_INTERVAL_MS,
+      retryRateLimitsIndefinitely: true,
       scope: indexerScope(),
       signal: controller.signal,
       onProgress: progressReporter(),
@@ -173,6 +175,7 @@ async function sevenDayBackfill() {
   const range = await resolveSevenDayRange(
     env.HYPEREVM_RPC_URL,
     env.FINALITY_LAG,
+    env.RPC_REQUEST_INTERVAL_MS,
   );
   console.log(
     JSON.stringify({
@@ -196,6 +199,7 @@ async function sync() {
     const range = await resolveSevenDayRange(
       env.HYPEREVM_RPC_URL,
       env.FINALITY_LAG,
+      env.RPC_REQUEST_INTERVAL_MS,
     );
     if (BigInt(checkpoint.next_block) > range.toBlock) {
       console.log(

@@ -5,6 +5,7 @@ describe("configuration fixtures", () => {
   it.each([
     ["negative finality", { FINALITY_LAG: "-1" }],
     ["fractional chunk", { RPC_LOG_CHUNK_SIZE: "1.5" }],
+    ["unsafe RPC pace", { RPC_REQUEST_INTERVAL_MS: "100" }],
     ["too-fast refresh", { REFRESH_INTERVAL_SECONDS: "1" }],
     ["unknown price source", { PRICE_SOURCE: "magic" }],
   ])("rejects %s", (_name, override) => {

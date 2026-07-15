@@ -17,6 +17,7 @@ describe("parseRuntimeEnv", () => {
       NODE_ENV: "test",
       FINALITY_LAG: 5,
       RPC_LOG_CHUNK_SIZE: 50,
+      RPC_REQUEST_INTERVAL_MS: 1_500,
       PRICE_SOURCE: "unconfigured",
       REFRESH_INTERVAL_SECONDS: 30,
     });
@@ -32,6 +33,12 @@ describe("parseRuntimeEnv", () => {
     expect(() =>
       parseRuntimeEnv({ ...validEnvironment, RPC_LOG_CHUNK_SIZE: "0" }),
     ).toThrow(/RPC_LOG_CHUNK_SIZE/);
+  });
+
+  it("rejects an unsafe RPC request interval", () => {
+    expect(() =>
+      parseRuntimeEnv({ ...validEnvironment, RPC_REQUEST_INTERVAL_MS: "100" }),
+    ).toThrow(/RPC_REQUEST_INTERVAL_MS/);
   });
 
   it("rejects a malformed RPC URL", () => {

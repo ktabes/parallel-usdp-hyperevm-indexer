@@ -58,9 +58,29 @@ export function classifyRpcError(error: unknown): RpcErrorClass {
   return "fatal";
 }
 
-export function retryDelayMs(attempt: number, errorClass: RpcErrorClass) {
+export function retryDelayMs(
+  attempt: number,
+  errorClass: RpcErrorClass,
+  random: () => number = Math.random,
+) {
   const base = errorClass === "rate-limit" ? 2_000 : 500;
-  return Math.min(15_000, base * 2 ** Math.max(0, attempt - 1));
+  const cap = errorClass === "rate-limit" ? 60_000 : 15_000;
+  const exponential = base * 2 ** Math.max(0, attempt - 1);
+  const jitter = 0.8 + random() * 0.4;
+  return Math.max(1, Math.min(cap, Math.round(exponential * jitter)));
+}
+
+export function shouldRetryRpcError(
+  errorClass: RpcErrorClass,
+  attempt: number,
+  maxRetries: number,
+  retryRateLimitsIndefinitely: boolean,
+) {
+  if (errorClass === "rate-limit" && retryRateLimitsIndefinitely) return true;
+  return (
+    (errorClass === "rate-limit" || errorClass === "transient") &&
+    attempt < maxRetries
+  );
 }
 
 export function mergeCoverage(ranges: BlockRange[]) {

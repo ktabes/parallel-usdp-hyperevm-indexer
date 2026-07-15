@@ -15,6 +15,7 @@ import {
   planBlockRange,
   reduceChunkSize,
   retryDelayMs,
+  shouldRetryRpcError,
   type BlockRange,
 } from "./planner";
 
@@ -48,6 +49,7 @@ export interface IngestLogsOptions {
   scope?: string;
   requestIntervalMs?: number;
   maxRetries?: number;
+  retryRateLimitsIndefinitely?: boolean;
   anchorEveryChunks?: number;
   fetchConcurrency?: number;
   signal?: AbortSignal;
@@ -114,11 +116,14 @@ async function fetchLogsWithPolicy(
   initialChunkSize: number,
   maxRetries: number,
   counters: IngestionCounters,
+  retryRateLimitsIndefinitely: boolean,
+  signal?: AbortSignal,
 ) {
   let chunkSize = initialChunkSize;
   let attempt = 0;
 
   while (true) {
+    if (signal?.aborted) throw new Error("Indexer interrupted");
     const range = planBlockRange(fromBlock, requestedToBlock, chunkSize);
     try {
       const logs = await client.getLogs({
@@ -136,8 +141,12 @@ async function fetchLogsWithPolicy(
         continue;
       }
       if (
-        (errorClass === "rate-limit" || errorClass === "transient") &&
-        attempt < maxRetries
+        shouldRetryRpcError(
+          errorClass,
+          attempt,
+          maxRetries,
+          retryRateLimitsIndefinitely,
+        )
       ) {
         attempt += 1;
         counters.rpcRetries += 1;
@@ -336,6 +345,7 @@ export async function ingestLogs(
   const counters = blankCounters();
   const client = createHyperevmClient(options.rpcUrl, {
     minRequestIntervalMs: options.requestIntervalMs ?? 650,
+    retryCount: 0,
   });
   const head = await client.getBlockNumber();
   const finalizedHead = head - BigInt(options.finalityLag);
@@ -437,6 +447,8 @@ export async function ingestLogs(
               activeChunkSize,
               options.maxRetries ?? 5,
               counters,
+              options.retryRateLimitsIndefinitely ?? false,
+              options.signal,
             ),
           };
         } catch (error) {
@@ -497,6 +509,11 @@ export async function ingestLogs(
     await updateRun(options.pool, runId, "completed", counters);
     return progress("completed");
   } catch (error) {
+    if (options.signal?.aborted) {
+      await updateRun(options.pool, runId, "interrupted", counters);
+      options.onProgress?.(progress("interrupted"));
+      return progress("interrupted");
+    }
     await updateRun(options.pool, runId, "failed", counters, error);
     options.onProgress?.(progress("failed"));
     throw error;

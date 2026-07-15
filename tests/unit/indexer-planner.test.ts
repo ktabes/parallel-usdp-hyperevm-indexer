@@ -6,6 +6,7 @@ import {
   planBlockRange,
   reduceChunkSize,
   retryDelayMs,
+  shouldRetryRpcError,
 } from "@/indexer/planner";
 
 describe("indexer range planning", () => {
@@ -35,7 +36,19 @@ describe("indexer range planning", () => {
     );
     expect(classifyRpcError(new Error("503 fetch failed"))).toBe("transient");
     expect(classifyRpcError(new Error("invalid address"))).toBe("fatal");
-    expect(retryDelayMs(10, "rate-limit")).toBe(15_000);
+    expect(retryDelayMs(1, "rate-limit", () => 0)).toBe(1_600);
+    expect(retryDelayMs(1, "rate-limit", () => 0.5)).toBe(2_000);
+    expect(retryDelayMs(1, "rate-limit", () => 1)).toBe(2_400);
+    expect(retryDelayMs(10, "rate-limit", () => 0.5)).toBe(60_000);
+    expect(retryDelayMs(10, "transient", () => 0.5)).toBe(15_000);
+  });
+
+  it("keeps rate limits retryable while retaining finite transient retries", () => {
+    expect(shouldRetryRpcError("rate-limit", 500, 5, true)).toBe(true);
+    expect(shouldRetryRpcError("rate-limit", 5, 5, false)).toBe(false);
+    expect(shouldRetryRpcError("transient", 4, 5, true)).toBe(true);
+    expect(shouldRetryRpcError("transient", 5, 5, true)).toBe(false);
+    expect(shouldRetryRpcError("fatal", 0, 5, true)).toBe(false);
   });
 
   it("merges overlapping reruns and identifies exact gaps", () => {
