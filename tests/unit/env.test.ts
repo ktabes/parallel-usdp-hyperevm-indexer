@@ -20,7 +20,7 @@ describe("parseRuntimeEnv", () => {
       RPC_REQUEST_INTERVAL_MS: 1_500,
       PRICE_SOURCE: "unconfigured",
       REFRESH_INTERVAL_SECONDS: 30,
-      GLOBAL_SNAPSHOT_MAX_AGE_SECONDS: 1_800,
+      GLOBAL_SNAPSHOT_MAX_AGE_SECONDS: 3_600,
     });
   });
 

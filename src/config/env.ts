@@ -64,7 +64,7 @@ export const runtimeEnvSchema = z.object({
     "GLOBAL_SNAPSHOT_MAX_AGE_SECONDS",
     30,
     86_400,
-  ).default(1_800),
+  ).default(3_600),
 });
 
 export type RuntimeEnv = z.infer<typeof runtimeEnvSchema>;
