@@ -27,4 +27,12 @@ describe("Savings fixed-point math", () => {
     expect(calculateNativeYpo(100n, 40n, 65n)).toBe(125n);
     expect(() => calculateNativeYpo(0n, 100n, 50n)).toThrow(/negative/);
   });
+
+  it("counts pending-yield growth even when no accrual transaction occurs", () => {
+    expect(calculateNativeYpo(0n, 40n, 65n)).toBe(25n);
+  });
+
+  it("does not double-count a materialized pending balance", () => {
+    expect(calculateNativeYpo(40n, 40n, 0n)).toBe(0n);
+  });
 });

@@ -51,4 +51,21 @@ describe("initial migration contract", () => {
     expect(migration).toContain('"manifest_version" text NOT NULL');
     expect(migration).toContain('"calculation_version" text NOT NULL');
   });
+
+  it("adds finalized vault snapshots and provenance-bound YPO intervals", async () => {
+    const migration = await readFile(
+      "drizzle/0003_groovy_bloodstorm.sql",
+      "utf8",
+    );
+
+    expect(migration).toContain('CREATE TABLE "vault_snapshots"');
+    expect(migration).toContain('CREATE TABLE "yield_aggregates"');
+    expect(migration).toContain(
+      'CREATE UNIQUE INDEX "vault_snapshots_provenance_block_unique"',
+    );
+    expect(migration).toContain('CONSTRAINT "yield_aggregates_range_check"');
+    expect(migration).toContain('"pending_yield_at_start" text NOT NULL');
+    expect(migration).toContain('"pending_yield_at_end" text NOT NULL');
+    expect(migration).toContain('"window_convention" text NOT NULL');
+  });
 });

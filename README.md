@@ -42,6 +42,13 @@ npm run cli -- sync
 npm run cli -- status
 npm run cli -- verify-coverage --from-block FROM --to-block TO
 npm run cli -- derive-flows --from-block FROM --to-block TO
+npm run cli -- snapshot
+npm run cli -- snapshot --block FINALIZED_BLOCK
+npm run cli -- calculate-yield --from-block START --to-block END
+npm run cli -- state
+npm run cli -- yield
+npm run cli -- rates
+npm run cli -- price
 npm run test:unit
 npm run test:fixtures
 npm run test:integration
@@ -49,6 +56,8 @@ npm run test:network
 ```
 
 `derive-flows` builds candidate hourly/daily native-flow aggregates and seven-day deposit/withdraw participant counts from normalized events. It returns `unavailable` and writes nothing unless `verify-coverage` proves the entire requested range. Transfer logs remain linked evidence and are deliberately excluded from authoritative Deposit, Withdraw, Swap, and Redeemed flow totals.
+
+`snapshot` captures contract state and DIA price evidence at a finalized block. `calculate-yield` implements the canonical `(start_block,end_block]` native-YPO formula and returns `unavailable` unless exact boundary snapshots and complete indexed coverage exist. The read-only analytics API is available at `/api/analytics/state`, `/api/analytics/yield`, `/api/analytics/rates`, and `/api/analytics/price`; missing or unreconciled data remains explicit rather than being synthesized.
 
 Network tests are opt-in and require `RUN_NETWORK_TESTS=1` plus a real `HYPEREVM_RPC_URL`. Integration tests run when `TEST_DATABASE_URL` is present and otherwise report as skipped.
 

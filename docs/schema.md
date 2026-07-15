@@ -15,7 +15,14 @@ The Phase 3 candidate migration adds two rebuildable layers:
 - `economic_events` classifies authoritative protocol events while retaining the source `protocol_event_id`, transaction context, source range, manifest version, and calculation version. Transfer evidence remains visible but is not promoted into deposit, withdrawal, issue, burn, or redemption flow.
 - `flow_aggregates` stores exact base-unit hourly and daily sums, event counts, and unique primary participants. Rows are tied to the exact covered source range and cannot be produced by the supported command while coverage is incomplete.
 
-Transfer ledgers, specialized vault/rate tables, snapshots, YPO aggregates, reconciliation runs, and health findings remain deferred to their later phase gates. The generic Phase 2 event table preserves decoded evidence so every Phase 3 classification can be rebuilt.
+Transfer ledgers, specialized rate-segment tables, reconciliation runs, and health findings remain deferred to their later phase gates. The generic Phase 2 event table preserves decoded evidence so every Phase 3 classification can be rebuilt.
+
+The Phase 4 candidate migration adds finalized evidence and interval calculations:
+
+- `vault_snapshots` stores USDp supply, sUSDp accounting state, pending yield, share price, rate/APR state, pause state, proxy implementations, and references to the exact pinned price observations.
+- `yield_aggregates` stores the two boundary snapshots, accrued interest, both pending-yield boundaries, native YPO, the `(start_block,end_block]` convention, and versioned provenance.
+
+Snapshot capture is independent of historical log coverage. YPO derivation is not: the supported calculation refuses to write unless both exact boundary snapshots exist and the complete interval passes the coverage check.
 
 ## Rules
 

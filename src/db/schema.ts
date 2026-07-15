@@ -381,3 +381,125 @@ export const flowAggregates = pgTable(
     ),
   ],
 );
+
+export const vaultSnapshots = pgTable(
+  "vault_snapshots",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    blockNumber: bigint("block_number", { mode: "bigint" }).notNull(),
+    blockHash: text("block_hash").notNull(),
+    blockTimestamp: timestamp("block_timestamp", {
+      withTimezone: true,
+    }).notNull(),
+    finalized: boolean("finalized").notNull(),
+    usdpTotalSupply: text("usdp_total_supply").notNull(),
+    susdpTotalAssets: text("susdp_total_assets").notNull(),
+    susdpActualAssets: text("susdp_actual_assets").notNull(),
+    susdpTotalSupply: text("susdp_total_supply").notNull(),
+    susdpPendingYield: text("susdp_pending_yield").notNull(),
+    susdpSharePriceUsdp: text("susdp_share_price_usdp").notNull(),
+    susdpRate: text("susdp_rate").notNull(),
+    susdpLastUpdate: bigint("susdp_last_update", { mode: "bigint" }).notNull(),
+    susdpEstimatedApr: text("susdp_estimated_apr").notNull(),
+    susdpMaxRate: text("susdp_max_rate").notNull(),
+    susdpPauseState: integer("susdp_pause_state").notNull(),
+    usdpImplementation: text("usdp_implementation").notNull(),
+    susdpImplementation: text("susdp_implementation").notNull(),
+    usdpPriceObservationId: bigint("usdp_price_observation_id", {
+      mode: "bigint",
+    })
+      .notNull()
+      .references(() => priceObservations.id, { onDelete: "restrict" }),
+    susdpPriceObservationId: bigint("susdp_price_observation_id", {
+      mode: "bigint",
+    })
+      .notNull()
+      .references(() => priceObservations.id, { onDelete: "restrict" }),
+    snapshotStatus: text("snapshot_status").notNull(),
+    manifestVersion: text("manifest_version").notNull(),
+    calculationVersion: text("calculation_version").notNull(),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("vault_snapshots_provenance_block_unique").on(
+      table.chainId,
+      table.blockNumber,
+      table.manifestVersion,
+      table.calculationVersion,
+    ),
+    index("vault_snapshots_chain_block_idx").on(
+      table.chainId,
+      table.blockNumber,
+    ),
+    check(
+      "vault_snapshots_status_check",
+      sql`${table.snapshotStatus} in ('candidate', 'verified', 'invalid')`,
+    ),
+    check(
+      "vault_snapshots_amounts_check",
+      sql`${table.usdpTotalSupply} ~ '^[0-9]+$'
+        and ${table.susdpTotalAssets} ~ '^[0-9]+$'
+        and ${table.susdpActualAssets} ~ '^[0-9]+$'
+        and ${table.susdpTotalSupply} ~ '^[0-9]+$'
+        and ${table.susdpPendingYield} ~ '^[0-9]+$'
+        and ${table.susdpSharePriceUsdp} ~ '^[0-9]+$'
+        and ${table.susdpRate} ~ '^[0-9]+$'
+        and ${table.susdpEstimatedApr} ~ '^[0-9]+$'
+        and ${table.susdpMaxRate} ~ '^[0-9]+$'`,
+    ),
+    check(
+      "vault_snapshots_pause_check",
+      sql`${table.susdpPauseState} between 0 and 255`,
+    ),
+  ],
+);
+
+export const yieldAggregates = pgTable(
+  "yield_aggregates",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    startSnapshotId: bigint("start_snapshot_id", { mode: "bigint" })
+      .notNull()
+      .references(() => vaultSnapshots.id, { onDelete: "restrict" }),
+    endSnapshotId: bigint("end_snapshot_id", { mode: "bigint" })
+      .notNull()
+      .references(() => vaultSnapshots.id, { onDelete: "restrict" }),
+    fromBlock: bigint("from_block", { mode: "bigint" }).notNull(),
+    toBlock: bigint("to_block", { mode: "bigint" }).notNull(),
+    accruedInterest: text("accrued_interest").notNull(),
+    pendingYieldAtStart: text("pending_yield_at_start").notNull(),
+    pendingYieldAtEnd: text("pending_yield_at_end").notNull(),
+    nativeYpo: text("native_ypo").notNull(),
+    windowConvention: text("window_convention").notNull(),
+    manifestVersion: text("manifest_version").notNull(),
+    calculationVersion: text("calculation_version").notNull(),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("yield_aggregates_provenance_range_unique").on(
+      table.chainId,
+      table.fromBlock,
+      table.toBlock,
+      table.manifestVersion,
+      table.calculationVersion,
+    ),
+    index("yield_aggregates_chain_range_idx").on(
+      table.chainId,
+      table.fromBlock,
+      table.toBlock,
+    ),
+    check(
+      "yield_aggregates_range_check",
+      sql`${table.toBlock} > ${table.fromBlock}`,
+    ),
+    check(
+      "yield_aggregates_amounts_check",
+      sql`${table.accruedInterest} ~ '^[0-9]+$'
+        and ${table.pendingYieldAtStart} ~ '^[0-9]+$'
+        and ${table.pendingYieldAtEnd} ~ '^[0-9]+$'
+        and ${table.nativeYpo} ~ '^[0-9]+$'`,
+    ),
+  ],
+);

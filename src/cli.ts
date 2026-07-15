@@ -1,5 +1,13 @@
 import { parseDiscoveryEnv, parseRuntimeEnv } from "@/config/env";
 import { rebuildFlowAnalytics } from "@/analytics/service";
+import {
+  readLatestYield,
+  readPrices,
+  readRates,
+  readState,
+} from "@/analytics/queries";
+import { captureVaultSnapshot } from "@/analytics/snapshots";
+import { calculateYieldForRange } from "@/analytics/yield";
 import { createDatabase } from "@/db/client";
 import {
   DEFAULT_INDEXER_SCOPE,
@@ -273,6 +281,68 @@ async function deriveFlows() {
   }
 }
 
+async function captureSnapshot() {
+  const env = parseRuntimeEnv(process.env);
+  const { pool } = createDatabase(env);
+  const block = argument("--block");
+  try {
+    console.log(
+      JSON.stringify(
+        await captureVaultSnapshot({
+          pool,
+          rpcUrl: env.HYPEREVM_RPC_URL,
+          finalityLag: env.FINALITY_LAG,
+          requestIntervalMs: env.RPC_REQUEST_INTERVAL_MS,
+          blockNumber: block ? BigInt(block) : undefined,
+        }),
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await pool.end();
+  }
+}
+
+async function calculateYield() {
+  const env = parseRuntimeEnv(process.env);
+  const { pool } = createDatabase(env);
+  try {
+    console.log(
+      JSON.stringify(
+        await calculateYieldForRange({
+          pool,
+          scope: indexerScope(),
+          fromBlock: BigInt(requiredArgument("--from-block")),
+          toBlock: BigInt(requiredArgument("--to-block")),
+        }),
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await pool.end();
+  }
+}
+
+async function showAnalytics(query: "state" | "yield" | "rates" | "price") {
+  const env = parseRuntimeEnv(process.env);
+  const { pool } = createDatabase(env);
+  try {
+    const result =
+      query === "state"
+        ? await readState(pool)
+        : query === "yield"
+          ? await readLatestYield(pool)
+          : query === "rates"
+            ? await readRates(pool)
+            : await readPrices(pool);
+    console.log(JSON.stringify(result, null, 2));
+  } finally {
+    await pool.end();
+  }
+}
+
 async function main() {
   switch (command) {
     case "config-check":
@@ -305,9 +375,21 @@ async function main() {
     case "derive-flows":
       await deriveFlows();
       return;
+    case "snapshot":
+      await captureSnapshot();
+      return;
+    case "calculate-yield":
+      await calculateYield();
+      return;
+    case "state":
+    case "yield":
+    case "rates":
+    case "price":
+      await showAnalytics(command);
+      return;
     default:
       throw new Error(
-        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|derive-flows>",
+        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|derive-flows|snapshot|calculate-yield|state|yield|rates|price>",
       );
   }
 }
