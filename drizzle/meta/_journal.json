@@ -15,6 +15,13 @@
       "when": 1784065541043,
       "tag": "0001_bent_lilandra",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784150913551,
+      "tag": "0002_lethal_umar",
+      "breakpoints": true
     }
   ]
 }

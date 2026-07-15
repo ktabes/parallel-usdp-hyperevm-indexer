@@ -38,4 +38,17 @@ describe("initial migration contract", () => {
       "contract_manifests_status_check\" CHECK (\"contract_manifests\".\"status\" in ('candidate', 'approved', 'superseded'))",
     );
   });
+
+  it("adds provenance-bound Phase 3 events and exact flow aggregates", async () => {
+    const migration = await readFile("drizzle/0002_lethal_umar.sql", "utf8");
+
+    expect(migration).toContain('CREATE TABLE "economic_events"');
+    expect(migration).toContain('CREATE TABLE "flow_aggregates"');
+    expect(migration).toContain(
+      'CREATE UNIQUE INDEX "economic_events_protocol_event_unique"',
+    );
+    expect(migration).toContain('"source_from_block" bigint NOT NULL');
+    expect(migration).toContain('"manifest_version" text NOT NULL');
+    expect(migration).toContain('"calculation_version" text NOT NULL');
+  });
 });

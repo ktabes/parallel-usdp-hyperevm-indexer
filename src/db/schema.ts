@@ -284,3 +284,100 @@ export const priceObservations = pgTable(
     ),
   ],
 );
+
+export const economicEvents = pgTable(
+  "economic_events",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    protocolEventId: bigint("protocol_event_id", { mode: "bigint" })
+      .notNull()
+      .references(() => protocolEvents.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    blockNumber: bigint("block_number", { mode: "bigint" }).notNull(),
+    transactionHash: text("transaction_hash").notNull(),
+    logIndex: integer("log_index").notNull(),
+    classification: text("classification").notNull(),
+    amountBaseUnits: text("amount_base_units"),
+    assetAddress: text("asset_address"),
+    primaryParticipant: text("primary_participant"),
+    secondaryParticipant: text("secondary_participant"),
+    transactionContext: jsonb("transaction_context").notNull().default({}),
+    sourceFromBlock: bigint("source_from_block", { mode: "bigint" }).notNull(),
+    sourceToBlock: bigint("source_to_block", { mode: "bigint" }).notNull(),
+    manifestVersion: text("manifest_version").notNull(),
+    calculationVersion: text("calculation_version").notNull(),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("economic_events_protocol_event_unique").on(
+      table.protocolEventId,
+    ),
+    index("economic_events_chain_block_idx").on(
+      table.chainId,
+      table.blockNumber,
+    ),
+    index("economic_events_classification_block_idx").on(
+      table.classification,
+      table.blockNumber,
+    ),
+    check(
+      "economic_events_source_range_check",
+      sql`${table.sourceToBlock} >= ${table.sourceFromBlock}`,
+    ),
+    check(
+      "economic_events_amount_check",
+      sql`${table.amountBaseUnits} is null or ${table.amountBaseUnits} ~ '^[0-9]+$'`,
+    ),
+  ],
+);
+
+export const flowAggregates = pgTable(
+  "flow_aggregates",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    granularity: text("granularity").notNull(),
+    bucketStart: timestamp("bucket_start", { withTimezone: true }).notNull(),
+    metric: text("metric").notNull(),
+    amountBaseUnits: text("amount_base_units").notNull(),
+    eventCount: integer("event_count").notNull(),
+    uniqueParticipants: integer("unique_participants").notNull(),
+    sourceFromBlock: bigint("source_from_block", { mode: "bigint" }).notNull(),
+    sourceToBlock: bigint("source_to_block", { mode: "bigint" }).notNull(),
+    manifestVersion: text("manifest_version").notNull(),
+    calculationVersion: text("calculation_version").notNull(),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("flow_aggregates_provenance_bucket_unique").on(
+      table.chainId,
+      table.granularity,
+      table.bucketStart,
+      table.metric,
+      table.sourceFromBlock,
+      table.sourceToBlock,
+      table.manifestVersion,
+      table.calculationVersion,
+    ),
+    index("flow_aggregates_chain_bucket_idx").on(
+      table.chainId,
+      table.bucketStart,
+    ),
+    check(
+      "flow_aggregates_granularity_check",
+      sql`${table.granularity} in ('hour', 'day')`,
+    ),
+    check(
+      "flow_aggregates_amount_check",
+      sql`${table.amountBaseUnits} ~ '^[0-9]+$'`,
+    ),
+    check(
+      "flow_aggregates_source_range_check",
+      sql`${table.sourceToBlock} >= ${table.sourceFromBlock}`,
+    ),
+    check(
+      "flow_aggregates_counts_check",
+      sql`${table.eventCount} >= 0 and ${table.uniqueParticipants} >= 0`,
+    ),
+  ],
+);

@@ -41,11 +41,14 @@ npm run cli -- seven-day-backfill
 npm run cli -- sync
 npm run cli -- status
 npm run cli -- verify-coverage --from-block FROM --to-block TO
+npm run cli -- derive-flows --from-block FROM --to-block TO
 npm run test:unit
 npm run test:fixtures
 npm run test:integration
 npm run test:network
 ```
+
+`derive-flows` builds candidate hourly/daily native-flow aggregates and seven-day deposit/withdraw participant counts from normalized events. It returns `unavailable` and writes nothing unless `verify-coverage` proves the entire requested range. Transfer logs remain linked evidence and are deliberately excluded from authoritative Deposit, Withdraw, Swap, and Redeemed flow totals.
 
 Network tests are opt-in and require `RUN_NETWORK_TESTS=1` plus a real `HYPEREVM_RPC_URL`. Integration tests run when `TEST_DATABASE_URL` is present and otherwise report as skipped.
 

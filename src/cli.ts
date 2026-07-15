@@ -1,4 +1,5 @@
 import { parseDiscoveryEnv, parseRuntimeEnv } from "@/config/env";
+import { rebuildFlowAnalytics } from "@/analytics/service";
 import { createDatabase } from "@/db/client";
 import {
   DEFAULT_INDEXER_SCOPE,
@@ -251,6 +252,27 @@ async function showCoverage() {
   }
 }
 
+async function deriveFlows() {
+  const env = parseRuntimeEnv(process.env);
+  const { pool } = createDatabase(env);
+  try {
+    console.log(
+      JSON.stringify(
+        await rebuildFlowAnalytics({
+          pool,
+          scope: indexerScope(),
+          fromBlock: BigInt(requiredArgument("--from-block")),
+          toBlock: BigInt(requiredArgument("--to-block")),
+        }),
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await pool.end();
+  }
+}
+
 async function main() {
   switch (command) {
     case "config-check":
@@ -280,9 +302,12 @@ async function main() {
     case "verify-coverage":
       await showCoverage();
       return;
+    case "derive-flows":
+      await deriveFlows();
+      return;
     default:
       throw new Error(
-        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage>",
+        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|derive-flows>",
       );
   }
 }

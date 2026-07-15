@@ -10,7 +10,12 @@ The Phase 0 migration establishes only the source and control plane that must re
 - `price_observations` keeps pricing attributed and separate from native protocol accounting.
 - `protocol_events` stores rebuildable decoded payloads linked one-to-one to their immutable raw logs.
 
-Transfer ledgers, specialized vault/rate tables, hourly flows, snapshots, YPO aggregates, reconciliation runs, and health findings remain deferred to their later phase gates. The generic Phase 2 event table preserves decoded evidence without prematurely assigning final economic classifications.
+The Phase 3 candidate migration adds two rebuildable layers:
+
+- `economic_events` classifies authoritative protocol events while retaining the source `protocol_event_id`, transaction context, source range, manifest version, and calculation version. Transfer evidence remains visible but is not promoted into deposit, withdrawal, issue, burn, or redemption flow.
+- `flow_aggregates` stores exact base-unit hourly and daily sums, event counts, and unique primary participants. Rows are tied to the exact covered source range and cannot be produced by the supported command while coverage is incomplete.
+
+Transfer ledgers, specialized vault/rate tables, snapshots, YPO aggregates, reconciliation runs, and health findings remain deferred to their later phase gates. The generic Phase 2 event table preserves decoded evidence so every Phase 3 classification can be rebuilt.
 
 ## Rules
 
