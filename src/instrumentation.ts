@@ -1,3 +1,5 @@
+import { providerErrorMessage } from "@/rpc/errors";
+
 export async function register() {
   if (
     process.env.NEXT_RUNTIME !== "nodejs" ||
@@ -10,7 +12,7 @@ export async function register() {
     console.error(
       JSON.stringify({
         event: "seven-day-backfill-failed",
-        message: error instanceof Error ? error.message : String(error),
+        message: providerErrorMessage(error),
       }),
     );
   });

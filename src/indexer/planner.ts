@@ -33,6 +33,7 @@ export function classifyRpcError(error: unknown): RpcErrorClass {
   if (
     message.includes("block range") ||
     message.includes("range limit") ||
+    (message.includes("limited to a") && message.includes("range")) ||
     message.includes("query exceeds") ||
     message.includes("response size") ||
     message.includes("too many results")
@@ -56,6 +57,14 @@ export function classifyRpcError(error: unknown): RpcErrorClass {
   )
     return "transient";
   return "fatal";
+}
+
+export function providerRangeLimit(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  const match = message.match(/limited to an?\s+(\d+)\s+(?:block\s+)?range/i);
+  if (!match?.[1]) return undefined;
+  const limit = Number(match[1]);
+  return Number.isSafeInteger(limit) && limit > 0 ? limit : undefined;
 }
 
 export function retryDelayMs(

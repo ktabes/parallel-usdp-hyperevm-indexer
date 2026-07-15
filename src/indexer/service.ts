@@ -13,11 +13,13 @@ import {
 import {
   classifyRpcError,
   planBlockRange,
+  providerRangeLimit,
   reduceChunkSize,
   retryDelayMs,
   shouldRetryRpcError,
   type BlockRange,
 } from "./planner";
+import { providerErrorMessage } from "@/rpc/errors";
 
 export const DEFAULT_INDEXER_SCOPE = "parallel-usdp-susdp-seven-day-v1";
 
@@ -135,7 +137,10 @@ async function fetchLogsWithPolicy(
     } catch (error) {
       const errorClass = classifyRpcError(error);
       if (errorClass === "range" && chunkSize > 1) {
-        chunkSize = reduceChunkSize(chunkSize);
+        const advertisedLimit = providerRangeLimit(error);
+        chunkSize = advertisedLimit
+          ? Math.min(advertisedLimit, chunkSize - 1)
+          : reduceChunkSize(chunkSize);
         counters.chunkReductions += 1;
         attempt = 0;
         continue;
@@ -331,8 +336,7 @@ async function updateRun(
       failure === undefined
         ? null
         : JSON.stringify({
-            message:
-              failure instanceof Error ? failure.message : String(failure),
+            message: providerErrorMessage(failure),
           }),
     ],
   );

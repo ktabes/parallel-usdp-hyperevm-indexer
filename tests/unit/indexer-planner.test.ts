@@ -4,6 +4,7 @@ import {
   coverageGaps,
   mergeCoverage,
   planBlockRange,
+  providerRangeLimit,
   reduceChunkSize,
   retryDelayMs,
   shouldRetryRpcError,
@@ -36,6 +37,11 @@ describe("indexer range planning", () => {
     );
     expect(classifyRpcError(new Error("503 fetch failed"))).toBe("transient");
     expect(classifyRpcError(new Error("invalid address"))).toBe("fatal");
+    const providerLimit = new Error(
+      "eth_getLogs is limited to a 5 range, upgrade your plan",
+    );
+    expect(classifyRpcError(providerLimit)).toBe("range");
+    expect(providerRangeLimit(providerLimit)).toBe(5);
     expect(retryDelayMs(1, "rate-limit", () => 0)).toBe(1_600);
     expect(retryDelayMs(1, "rate-limit", () => 0.5)).toBe(2_000);
     expect(retryDelayMs(1, "rate-limit", () => 1)).toBe(2_400);

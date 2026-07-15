@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { HYPEREVM_CHAIN_ID } from "@/protocol/hyperevm";
+import { providerErrorMessage } from "@/rpc/errors";
 import { coverageGaps, type BlockRange } from "./planner";
 
 export async function verifyCoverage(
@@ -59,6 +60,15 @@ export async function indexerStatus(pool: Pool, scope: string) {
     scope,
     checkpoint: checkpoint.rows[0] ?? null,
     totals: totals.rows[0] ?? null,
-    recentRuns: runs.rows,
+    recentRuns: runs.rows.map((run) => {
+      const failure = run.failure as { message?: unknown } | null;
+      return {
+        ...run,
+        failure:
+          failure && "message" in failure
+            ? { ...failure, message: providerErrorMessage(failure.message) }
+            : failure,
+      };
+    }),
   };
 }

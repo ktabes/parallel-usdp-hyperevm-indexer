@@ -1,6 +1,7 @@
 import { parseRuntimeEnv } from "@/config/env";
 import { createDatabase } from "@/db/client";
 import { HYPEREVM_CHAIN_ID } from "@/protocol/hyperevm";
+import { providerErrorMessage } from "@/rpc/errors";
 import {
   DEFAULT_INDEXER_SCOPE,
   ingestLogs,
@@ -109,7 +110,7 @@ export async function runSevenDayWorker() {
             event: "seven-day-backfill-recovering",
             errorClass,
             retryInMs,
-            message: error instanceof Error ? error.message : String(error),
+            message: providerErrorMessage(error),
           }),
         );
         await wait(retryInMs);
