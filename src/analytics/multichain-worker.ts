@@ -4,6 +4,8 @@ import { providerErrorMessage } from "@/rpc/errors";
 import { captureConfiguredSavingsSnapshots } from "./multichain-snapshots";
 
 const WORKER_LOCK_ID = 999_700_002;
+const LOCK_RETRY_INTERVAL_MS = 5_000;
+const LOCK_RETRY_ATTEMPTS = 12;
 
 const wait = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
@@ -20,15 +22,29 @@ export async function runMultichainSnapshotWorker() {
   process.once("SIGTERM", interrupt);
 
   try {
-    const lock = await lockClient.query<{ acquired: boolean }>(
-      "select pg_try_advisory_lock($1) as acquired",
-      [WORKER_LOCK_ID],
-    );
-    if (!lock.rows[0]?.acquired) {
+    let acquired = false;
+    for (let attempt = 1; attempt <= LOCK_RETRY_ATTEMPTS; attempt += 1) {
+      const lock = await lockClient.query<{ acquired: boolean }>(
+        "select pg_try_advisory_lock($1) as acquired",
+        [WORKER_LOCK_ID],
+      );
+      acquired = Boolean(lock.rows[0]?.acquired);
+      if (acquired) break;
       console.log(
         JSON.stringify({
-          event: "multichain-snapshot-worker-skipped",
+          event: "multichain-snapshot-worker-waiting",
           reason: "lock-held",
+          attempt,
+          maximumAttempts: LOCK_RETRY_ATTEMPTS,
+        }),
+      );
+      if (attempt < LOCK_RETRY_ATTEMPTS) await wait(LOCK_RETRY_INTERVAL_MS);
+    }
+    if (!acquired) {
+      console.log(
+        JSON.stringify({
+          event: "multichain-snapshot-worker-stopped",
+          reason: "lock-remained-held",
         }),
       );
       return { status: "already-running" } as const;
