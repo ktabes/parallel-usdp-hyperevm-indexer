@@ -13,6 +13,13 @@ const optionalSecret = z.preprocess(
   z.string().min(1).optional(),
 );
 
+const optionalUrl = (name: string) =>
+  z.preprocess(
+    (value) =>
+      typeof value === "string" && value.trim() === "" ? undefined : value,
+    z.url(`${name} must be a valid URL`).optional(),
+  );
+
 const booleanFlag = z
   .enum(["0", "1"])
   .default("0")
@@ -26,9 +33,14 @@ export const runtimeEnvSchema = z.object({
     .string()
     .regex(/^postgres(?:ql)?:\/\//, "DATABASE_URL must be a PostgreSQL URL"),
   HYPEREVM_RPC_URL: z.url("HYPEREVM_RPC_URL must be a valid URL"),
+  ETHEREUM_RPC_URL: optionalUrl("ETHEREUM_RPC_URL"),
+  BASE_RPC_URL: optionalUrl("BASE_RPC_URL"),
+  SONIC_RPC_URL: optionalUrl("SONIC_RPC_URL"),
+  AVALANCHE_RPC_URL: optionalUrl("AVALANCHE_RPC_URL"),
   ALCHEMY_API_KEY: optionalSecret,
   ONFINALITY_API_KEY: optionalSecret,
   RUN_SEVEN_DAY_BACKFILL: booleanFlag,
+  RUN_MULTICHAIN_SNAPSHOTS: booleanFlag,
   FINALITY_LAG: integerFromString("FINALITY_LAG", 1, 10_000).default(5),
   RPC_LOG_CHUNK_SIZE: integerFromString(
     "RPC_LOG_CHUNK_SIZE",
@@ -48,6 +60,11 @@ export const runtimeEnvSchema = z.object({
     15,
     3_600,
   ).default(30),
+  GLOBAL_SNAPSHOT_MAX_AGE_SECONDS: integerFromString(
+    "GLOBAL_SNAPSHOT_MAX_AGE_SECONDS",
+    30,
+    86_400,
+  ).default(300),
 });
 
 export type RuntimeEnv = z.infer<typeof runtimeEnvSchema>;

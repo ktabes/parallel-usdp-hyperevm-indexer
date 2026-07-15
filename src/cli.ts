@@ -8,6 +8,8 @@ import {
 } from "@/analytics/queries";
 import { captureVaultSnapshot } from "@/analytics/snapshots";
 import { calculateYieldForRange } from "@/analytics/yield";
+import { readLatestGlobalSavings } from "@/analytics/global-queries";
+import { captureConfiguredSavingsSnapshots } from "@/analytics/multichain-snapshots";
 import { createDatabase } from "@/db/client";
 import {
   DEFAULT_INDEXER_SCOPE,
@@ -70,6 +72,14 @@ async function configCheck() {
         logChunkSize: env.RPC_LOG_CHUNK_SIZE,
         priceSource: env.PRICE_SOURCE,
         refreshIntervalSeconds: env.REFRESH_INTERVAL_SECONDS,
+        globalSnapshotMaximumAgeSeconds: env.GLOBAL_SNAPSHOT_MAX_AGE_SECONDS,
+        configuredSavingsChains: {
+          ethereum: Boolean(env.ETHEREUM_RPC_URL),
+          base: Boolean(env.BASE_RPC_URL),
+          sonic: Boolean(env.SONIC_RPC_URL),
+          hyperevm: Boolean(env.HYPEREVM_RPC_URL),
+          avalanche: Boolean(env.AVALANCHE_RPC_URL),
+        },
       },
       null,
       2,
@@ -304,6 +314,41 @@ async function captureSnapshot() {
   }
 }
 
+async function captureMultichainSnapshots() {
+  const env = parseRuntimeEnv(process.env);
+  const { pool } = createDatabase(env);
+  try {
+    console.log(
+      JSON.stringify(
+        await captureConfiguredSavingsSnapshots(pool, env),
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await pool.end();
+  }
+}
+
+async function showGlobalSavings() {
+  const env = parseRuntimeEnv(process.env);
+  const { pool } = createDatabase(env);
+  try {
+    console.log(
+      JSON.stringify(
+        await readLatestGlobalSavings(
+          pool,
+          env.GLOBAL_SNAPSHOT_MAX_AGE_SECONDS,
+        ),
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await pool.end();
+  }
+}
+
 async function calculateYield() {
   const env = parseRuntimeEnv(process.env);
   const { pool } = createDatabase(env);
@@ -378,6 +423,9 @@ async function main() {
     case "snapshot":
       await captureSnapshot();
       return;
+    case "snapshot-all":
+      await captureMultichainSnapshots();
+      return;
     case "calculate-yield":
       await calculateYield();
       return;
@@ -387,9 +435,12 @@ async function main() {
     case "price":
       await showAnalytics(command);
       return;
+    case "global":
+      await showGlobalSavings();
+      return;
     default:
       throw new Error(
-        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|derive-flows|snapshot|calculate-yield|state|yield|rates|price>",
+        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|derive-flows|snapshot|snapshot-all|calculate-yield|state|yield|rates|price|global>",
       );
   }
 }
@@ -401,6 +452,10 @@ main().catch((error: unknown) => {
       process.env.ALCHEMY_API_KEY,
       process.env.ONFINALITY_API_KEY,
       process.env.HYPEREVM_RPC_URL,
+      process.env.ETHEREUM_RPC_URL,
+      process.env.BASE_RPC_URL,
+      process.env.SONIC_RPC_URL,
+      process.env.AVALANCHE_RPC_URL,
     ]),
   );
   process.exitCode = 1;

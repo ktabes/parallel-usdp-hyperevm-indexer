@@ -7,6 +7,7 @@ import {
   usdpDeployments,
 } from "@/protocol/assets";
 import { hyperevmProtocol } from "@/protocol/hyperevm";
+import { savingsChainAdapters } from "@/protocol/savings-chains";
 
 describe("Parallel cross-chain asset registry", () => {
   it("models the complete official USDp and sUSDp deployment sets", () => {
@@ -48,5 +49,19 @@ describe("Parallel cross-chain asset registry", () => {
       /^https:\/\/docs\.parallel\.best/,
     );
     expect(parallelAssetRegistry.assets.susdp.underlyingAssetId).toBe("usdp");
+  });
+
+  it("defines a finalized state adapter for every official sUSDp chain", () => {
+    expect(savingsChainAdapters.map(({ chainId }) => chainId)).toEqual([
+      1, 8453, 146, 999, 43114,
+    ]);
+    expect(
+      savingsChainAdapters.filter(
+        ({ finality }) => finality === "rpc-finalized",
+      ),
+    ).toHaveLength(4);
+    expect(
+      savingsChainAdapters.find(({ chainId }) => chainId === 999)?.finality,
+    ).toBe("confirmation-lag");
   });
 });

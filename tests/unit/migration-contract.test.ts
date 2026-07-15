@@ -68,4 +68,25 @@ describe("initial migration contract", () => {
     expect(migration).toContain('"pending_yield_at_end" text NOT NULL');
     expect(migration).toContain('"window_convention" text NOT NULL');
   });
+
+  it("adds normalized chain snapshots and component-linked global savings state", async () => {
+    const migration = await readFile(
+      "drizzle/0004_spooky_stellaris.sql",
+      "utf8",
+    );
+
+    expect(migration).toContain('CREATE TABLE "asset_deployments"');
+    expect(migration).toContain('CREATE TABLE "asset_chain_snapshots"');
+    expect(migration).toContain('CREATE TABLE "savings_chain_snapshots"');
+    expect(migration).toContain('CREATE TABLE "global_savings_snapshots"');
+    expect(migration).toContain(
+      'CREATE TABLE "global_savings_snapshot_components"',
+    );
+    expect(migration).toContain(
+      'CONSTRAINT "asset_chain_snapshots_deployment_fk"',
+    );
+    expect(migration).toContain(
+      'CREATE UNIQUE INDEX "global_savings_components_chain_unique"',
+    );
+  });
 });

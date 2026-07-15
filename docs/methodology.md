@@ -2,7 +2,7 @@
 
 ## Evidence hierarchy
 
-1. Finalized HyperEVM logs and pinned-block contract reads.
+1. Finalized chain-local logs and pinned-block contract reads from official USDp/sUSDp deployments.
 2. Official Parallel source code and deployment documentation, tied to a commit or version.
 3. Attributed price observations used only under a documented freshness and confidence policy.
 4. External analytics as comparisons, never as the sole source for native flows or Yield Paid Out.
@@ -11,7 +11,11 @@ Every production metric must record its chain, source block or range, block time
 
 ## Finality and time
 
-The indexer advances only through the configured finalized head (`chain head - FINALITY_LAG`) until Phase 1 establishes a stronger chain-specific finality rule. Block timestamps are authoritative for protocol events. API presentation may include wall-clock observation time, but it must never replace block time.
+Ethereum, Base, Sonic, and Avalanche current-state adapters use the RPC `finalized` block tag. HyperEVM uses `chain head - FINALITY_LAG` because its verified adapter predates the multichain layer and its provider behavior was tested with that rule. Block timestamps are authoritative for protocol events. A global snapshot aligns finalized component snapshots by UTC time; it never pretends that unrelated chain block numbers are comparable. API presentation may include wall-clock observation time, but it must never replace block time.
+
+## Cross-chain aggregation
+
+Chain-local token and vault reads remain the evidence units. A global sUSDp snapshot links to every included chain component and reports expected, included, missing, stale, and invalid chains. Global sUSDp assets and YPO are additive only across aligned valid components. The headline estimated APY is weighted by chain-local `totalAssets`; rates are never summed. USDp supply across the five savings chains is explicitly a partial distribution metric until all 24 official USDp deployments and V3 bridge accounting are verified.
 
 ## Availability
 

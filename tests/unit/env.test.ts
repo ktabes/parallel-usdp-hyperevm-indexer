@@ -20,6 +20,7 @@ describe("parseRuntimeEnv", () => {
       RPC_REQUEST_INTERVAL_MS: 1_500,
       PRICE_SOURCE: "unconfigured",
       REFRESH_INTERVAL_SECONDS: 30,
+      GLOBAL_SNAPSHOT_MAX_AGE_SECONDS: 300,
     });
   });
 
@@ -45,6 +46,22 @@ describe("parseRuntimeEnv", () => {
     expect(() =>
       parseRuntimeEnv({ ...validEnvironment, HYPEREVM_RPC_URL: "not-a-url" }),
     ).toThrow(/HYPEREVM_RPC_URL/);
+  });
+
+  it("accepts optional multichain RPCs and rejects malformed ones", () => {
+    expect(
+      parseRuntimeEnv({
+        ...validEnvironment,
+        ETHEREUM_RPC_URL: "https://ethereum-rpc.example",
+        BASE_RPC_URL: "",
+      }),
+    ).toMatchObject({
+      ETHEREUM_RPC_URL: "https://ethereum-rpc.example",
+      BASE_RPC_URL: undefined,
+    });
+    expect(() =>
+      parseRuntimeEnv({ ...validEnvironment, SONIC_RPC_URL: "not-a-url" }),
+    ).toThrow(/SONIC_RPC_URL/);
   });
 
   it("accepts an optional Alchemy key without exposing it in a URL", () => {

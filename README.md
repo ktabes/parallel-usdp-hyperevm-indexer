@@ -47,11 +47,13 @@ npm run cli -- verify-coverage --from-block FROM --to-block TO
 npm run cli -- derive-flows --from-block FROM --to-block TO
 npm run cli -- snapshot
 npm run cli -- snapshot --block FINALIZED_BLOCK
+npm run cli -- snapshot-all
 npm run cli -- calculate-yield --from-block START --to-block END
 npm run cli -- state
 npm run cli -- yield
 npm run cli -- rates
 npm run cli -- price
+npm run cli -- global
 npm run test:unit
 npm run test:fixtures
 npm run test:integration
@@ -60,13 +62,15 @@ npm run test:network
 
 `derive-flows` builds candidate hourly/daily native-flow aggregates and seven-day deposit/withdraw participant counts from normalized events. It returns `unavailable` and writes nothing unless `verify-coverage` proves the entire requested range. Transfer logs remain linked evidence and are deliberately excluded from authoritative Deposit, Withdraw, Swap, and Redeemed flow totals.
 
-`snapshot` captures contract state and DIA price evidence at a finalized block. `calculate-yield` implements the canonical `(start_block,end_block]` native-YPO formula and returns `unavailable` unless exact boundary snapshots and complete indexed coverage exist. The read-only analytics API is available at `/api/analytics/state`, `/api/analytics/yield`, `/api/analytics/rates`, and `/api/analytics/price`; missing or unreconciled data remains explicit rather than being synthesized.
+`snapshot` captures the original HyperEVM contract state and DIA price evidence at a finalized block. `snapshot-all` captures finalized current state for every configured official sUSDp chain, persists chain token/vault evidence, and writes a component-linked global savings snapshot. `calculate-yield` implements the canonical `(start_block,end_block]` native-YPO formula and returns `unavailable` unless exact boundary snapshots and complete indexed coverage exist. The read-only analytics API is available at `/api/analytics/state`, `/api/analytics/yield`, `/api/analytics/rates`, `/api/analytics/price`, and `/api/analytics/global`; missing, stale, partial, or unreconciled data remains explicit rather than being synthesized.
 
 Network tests are opt-in and require `RUN_NETWORK_TESTS=1` plus a real `HYPEREVM_RPC_URL`. Integration tests run when `TEST_DATABASE_URL` is present and otherwise report as skipped.
 
 The official HyperEVM RPC is the default seven-day log source. It limits `eth_getLogs` to 50-block ranges and approximately 100 requests per minute, so the initial week is a long, resumable one-time job rather than a deployment startup task. Ingestion defaults to one request start every 1,500 ms, applies jittered backoff, retries rate limits indefinitely, and commits each successful range before continuing. The optional `ALCHEMY_API_KEY` provides recent-state reads but is not treated as historical. OnFinality remains optional for strict archive certification. Provider roles are assigned from live capability evidence rather than marketing claims.
 
 On Railway, set `RUN_SEVEN_DAY_BACKFILL=1` to start the worker beside the web service. A PostgreSQL advisory lock prevents duplicate workers, recoverable RPC failures restart from the durable checkpoint, and `/api/indexer/status` exposes the checkpoint, stored row counts, and recent runs. `RPC_REQUEST_INTERVAL_MS` can tune the pace, but the conservative `1500` default is recommended for the public endpoint. Set the flag back to `0` after the initial week completes if continuous catch-up is not wanted.
+
+For cross-chain current state, configure `ETHEREUM_RPC_URL`, `BASE_RPC_URL`, `SONIC_RPC_URL`, and `AVALANCHE_RPC_URL` alongside the existing `HYPEREVM_RPC_URL`, then set `RUN_MULTICHAIN_SNAPSHOTS=1`. Ethereum, Base, Sonic, and Avalanche use their RPC `finalized` block tag; HyperEVM retains its configured confirmation lag. The worker uses one Multicall state read per non-HyperEVM chain, records missing or failed RPCs as partial coverage, and never takes down the web service because one chain is unavailable. `GLOBAL_SNAPSHOT_MAX_AGE_SECONDS` defaults to `300`.
 
 ## Phase gates
 

@@ -382,6 +382,261 @@ export const flowAggregates = pgTable(
   ],
 );
 
+export const assetDeployments = pgTable(
+  "asset_deployments",
+  {
+    assetId: text("asset_id").notNull(),
+    chainId: integer("chain_id").notNull(),
+    chainSlug: text("chain_slug").notNull(),
+    chainName: text("chain_name").notNull(),
+    contractAddress: text("contract_address").notNull(),
+    deploymentTier: text("deployment_tier").notNull(),
+    adapterStatus: text("adapter_status").notNull(),
+    officialSource: text("official_source").notNull(),
+    sourceCheckedAt: timestamp("source_checked_at", {
+      withTimezone: true,
+    }).notNull(),
+    createdAt,
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.assetId, table.chainId] }),
+    uniqueIndex("asset_deployments_chain_address_unique").on(
+      table.chainId,
+      table.contractAddress,
+    ),
+    check(
+      "asset_deployments_asset_check",
+      sql`${table.assetId} in ('usdp', 'susdp')`,
+    ),
+    check(
+      "asset_deployments_tier_check",
+      sql`${table.deploymentTier} in ('savings', 'distribution')`,
+    ),
+    check(
+      "asset_deployments_status_check",
+      sql`${table.adapterStatus} in ('planned', 'verified', 'disabled')`,
+    ),
+    check(
+      "asset_deployments_address_check",
+      sql`${table.contractAddress} ~ '^0x[0-9a-f]{40}$'`,
+    ),
+  ],
+);
+
+export const assetChainSnapshots = pgTable(
+  "asset_chain_snapshots",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    assetId: text("asset_id").notNull(),
+    chainId: integer("chain_id").notNull(),
+    blockNumber: bigint("block_number", { mode: "bigint" }).notNull(),
+    blockHash: text("block_hash").notNull(),
+    blockTimestamp: timestamp("block_timestamp", {
+      withTimezone: true,
+    }).notNull(),
+    finalized: boolean("finalized").notNull(),
+    totalSupply: text("total_supply").notNull(),
+    snapshotStatus: text("snapshot_status").notNull(),
+    manifestVersion: text("manifest_version").notNull(),
+    calculationVersion: text("calculation_version").notNull(),
+    createdAt,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.assetId, table.chainId],
+      foreignColumns: [assetDeployments.assetId, assetDeployments.chainId],
+      name: "asset_chain_snapshots_deployment_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.chainId, table.blockNumber],
+      foreignColumns: [blocks.chainId, blocks.number],
+      name: "asset_chain_snapshots_block_fk",
+    }).onDelete("restrict"),
+    uniqueIndex("asset_chain_snapshots_provenance_unique").on(
+      table.assetId,
+      table.chainId,
+      table.blockNumber,
+      table.manifestVersion,
+      table.calculationVersion,
+    ),
+    index("asset_chain_snapshots_latest_idx").on(
+      table.assetId,
+      table.chainId,
+      table.blockNumber,
+    ),
+    check(
+      "asset_chain_snapshots_status_check",
+      sql`${table.snapshotStatus} in ('candidate', 'verified', 'invalid')`,
+    ),
+    check(
+      "asset_chain_snapshots_supply_check",
+      sql`${table.totalSupply} ~ '^[0-9]+$'`,
+    ),
+  ],
+);
+
+export const savingsChainSnapshots = pgTable(
+  "savings_chain_snapshots",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    blockNumber: bigint("block_number", { mode: "bigint" }).notNull(),
+    blockHash: text("block_hash").notNull(),
+    blockTimestamp: timestamp("block_timestamp", {
+      withTimezone: true,
+    }).notNull(),
+    usdpSnapshotId: bigint("usdp_snapshot_id", { mode: "bigint" })
+      .notNull()
+      .references(() => assetChainSnapshots.id, { onDelete: "restrict" }),
+    susdpSnapshotId: bigint("susdp_snapshot_id", { mode: "bigint" })
+      .notNull()
+      .references(() => assetChainSnapshots.id, { onDelete: "restrict" }),
+    susdpTotalAssets: text("susdp_total_assets").notNull(),
+    susdpActualAssets: text("susdp_actual_assets").notNull(),
+    susdpPendingYield: text("susdp_pending_yield").notNull(),
+    susdpSharePriceUsdp: text("susdp_share_price_usdp").notNull(),
+    susdpRate: text("susdp_rate").notNull(),
+    susdpLastUpdate: bigint("susdp_last_update", { mode: "bigint" }).notNull(),
+    susdpEstimatedApy: text("susdp_estimated_apy").notNull(),
+    susdpMaxRate: text("susdp_max_rate").notNull(),
+    susdpPauseState: integer("susdp_pause_state").notNull(),
+    usdpImplementation: text("usdp_implementation").notNull(),
+    susdpImplementation: text("susdp_implementation").notNull(),
+    assetRelationshipVerified: boolean("asset_relationship_verified").notNull(),
+    snapshotStatus: text("snapshot_status").notNull(),
+    manifestVersion: text("manifest_version").notNull(),
+    calculationVersion: text("calculation_version").notNull(),
+    createdAt,
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.chainId, table.blockNumber],
+      foreignColumns: [blocks.chainId, blocks.number],
+      name: "savings_chain_snapshots_block_fk",
+    }).onDelete("restrict"),
+    uniqueIndex("savings_chain_snapshots_provenance_unique").on(
+      table.chainId,
+      table.blockNumber,
+      table.manifestVersion,
+      table.calculationVersion,
+    ),
+    index("savings_chain_snapshots_latest_idx").on(
+      table.chainId,
+      table.blockNumber,
+    ),
+    check(
+      "savings_chain_snapshots_status_check",
+      sql`${table.snapshotStatus} in ('candidate', 'verified', 'invalid')`,
+    ),
+    check(
+      "savings_chain_snapshots_amounts_check",
+      sql`${table.susdpTotalAssets} ~ '^[0-9]+$'
+        and ${table.susdpActualAssets} ~ '^[0-9]+$'
+        and ${table.susdpPendingYield} ~ '^[0-9]+$'
+        and ${table.susdpSharePriceUsdp} ~ '^[0-9]+$'
+        and ${table.susdpRate} ~ '^[0-9]+$'
+        and ${table.susdpEstimatedApy} ~ '^[0-9]+$'
+        and ${table.susdpMaxRate} ~ '^[0-9]+$'`,
+    ),
+    check(
+      "savings_chain_snapshots_pause_check",
+      sql`${table.susdpPauseState} between 0 and 255`,
+    ),
+    check(
+      "savings_chain_snapshots_usdp_impl_check",
+      sql`${table.usdpImplementation} ~ '^0x[0-9a-f]{40}$'`,
+    ),
+    check(
+      "savings_chain_snapshots_susdp_impl_check",
+      sql`${table.susdpImplementation} ~ '^0x[0-9a-f]{40}$'`,
+    ),
+  ],
+);
+
+export const globalSavingsSnapshots = pgTable(
+  "global_savings_snapshots",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    expectedChainCount: integer("expected_chain_count").notNull(),
+    includedChainCount: integer("included_chain_count").notNull(),
+    coverageStatus: text("coverage_status").notNull(),
+    usdpSupplyOnSavingsChains: text("usdp_supply_on_savings_chains").notNull(),
+    susdpTotalAssets: text("susdp_total_assets").notNull(),
+    susdpTotalSupply: text("susdp_total_supply").notNull(),
+    susdpWeightedEstimatedApy: text("susdp_weighted_estimated_apy"),
+    oldestComponentTimestamp: timestamp("oldest_component_timestamp", {
+      withTimezone: true,
+    }),
+    newestComponentTimestamp: timestamp("newest_component_timestamp", {
+      withTimezone: true,
+    }),
+    maximumComponentAgeSeconds: bigint("maximum_component_age_seconds", {
+      mode: "bigint",
+    }),
+    includedChainIds: jsonb("included_chain_ids")
+      .$type<number[]>()
+      .notNull()
+      .default([]),
+    missingChainIds: jsonb("missing_chain_ids")
+      .$type<number[]>()
+      .notNull()
+      .default([]),
+    staleChainIds: jsonb("stale_chain_ids")
+      .$type<number[]>()
+      .notNull()
+      .default([]),
+    calculationVersion: text("calculation_version").notNull(),
+    createdAt,
+  },
+  (table) => [
+    index("global_savings_snapshots_as_of_idx").on(table.asOf),
+    check(
+      "global_savings_snapshots_status_check",
+      sql`${table.coverageStatus} in ('complete', 'partial', 'unavailable')`,
+    ),
+    check(
+      "global_savings_snapshots_counts_check",
+      sql`${table.expectedChainCount} >= 0
+        and ${table.includedChainCount} >= 0
+        and ${table.includedChainCount} <= ${table.expectedChainCount}`,
+    ),
+    check(
+      "global_savings_snapshots_amounts_check",
+      sql`${table.usdpSupplyOnSavingsChains} ~ '^[0-9]+$'
+        and ${table.susdpTotalAssets} ~ '^[0-9]+$'
+        and ${table.susdpTotalSupply} ~ '^[0-9]+$'
+        and (${table.susdpWeightedEstimatedApy} is null
+          or ${table.susdpWeightedEstimatedApy} ~ '^[0-9]+$')`,
+    ),
+  ],
+);
+
+export const globalSavingsSnapshotComponents = pgTable(
+  "global_savings_snapshot_components",
+  {
+    globalSnapshotId: bigint("global_snapshot_id", { mode: "bigint" })
+      .notNull()
+      .references(() => globalSavingsSnapshots.id, { onDelete: "cascade" }),
+    savingsSnapshotId: bigint("savings_snapshot_id", { mode: "bigint" })
+      .notNull()
+      .references(() => savingsChainSnapshots.id, { onDelete: "restrict" }),
+    chainId: integer("chain_id").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.globalSnapshotId, table.savingsSnapshotId],
+    }),
+    uniqueIndex("global_savings_components_chain_unique").on(
+      table.globalSnapshotId,
+      table.chainId,
+    ),
+  ],
+);
+
 export const vaultSnapshots = pgTable(
   "vault_snapshots",
   {
