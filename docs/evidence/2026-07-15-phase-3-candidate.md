@@ -29,3 +29,5 @@
 ## Remaining gate
 
 This is a code-complete Phase 3 candidate, not approved production analytics. The seven-day Phase 2 range remains incomplete because the archive provider reached its daily request quota. `derive-flows` returns `coverage_incomplete` and performs no writes until the requested range has no gaps. Production values and the public dashboard must remain unavailable until backfill coverage and transaction-level review pass.
+
+The completed contiguous production slice and five representative transactions were subsequently reviewed in [the Phase 3 transaction report](./2026-07-15-phase-3-transaction-review.md). That review validates the present issuance, burn, transfer, and deployment-deposit sample while keeping absent withdrawal, accrual, and redemption types explicitly unverified.
