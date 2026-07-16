@@ -7,7 +7,8 @@ and traced back to code and PostgreSQL evidence second.
 
 1. Open the [public dashboard](https://content-spirit-production-5efa.up.railway.app).
    The headline combines USDp stablecoin distribution with sUSDp ERC-4626
-   savings state rather than treating them as the same asset.
+   savings state rather than treating them as the same asset. The page refreshes
+   from PostgreSQL every 60 seconds.
 2. Open the [StableWatch projection](https://content-spirit-production-5efa.up.railway.app/api/v1/stablewatch/assets/parallel-usdp-susdp).
    Every headline metric has independent availability and verification status.
 3. Open the [24-chain USDp supply evidence](https://content-spirit-production-5efa.up.railway.app/api/analytics/usdp-supply).
@@ -22,6 +23,28 @@ and traced back to code and PostgreSQL evidence second.
    npm ci
    npm run reviewer:proof
    ```
+
+## Live publication behavior
+
+The lifetime activity table is pre-wired to persisted chain checkpoints and
+derived aggregates:
+
+- `Indexing history` reports the durable checkpoint percentage without exposing
+  partial activity totals.
+- `Deriving metrics` means the range is gap-free and holder/flow derivation is
+  running.
+- `Published` means both USDp and sUSDp lifetime aggregates are complete; the
+  transfer, holder, and vault-flow cells populate on the next 60-second refresh.
+
+Base is the initial published reference row. Ethereum, Sonic, and Avalanche use
+the same schema and require no dashboard change when their backfills finish.
+HyperEVM is shown separately as a verified seven-day history because its public
+log limits make lifetime replay a materially different archive workload.
+
+The visible dashboard does not use the internal word `candidate` as a generic
+quality badge. It names the concrete evidence state instead: finalized onchain,
+24-chain onchain, price-attributed, reconciled, or awaiting coverage. The trust
+layer explains the API lifecycle term and links to the unmodified raw payload.
 
 ## What the proof command requires
 

@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { readLifetimeDashboard } from "@/analytics/dashboard-readiness";
 import { readLatestGlobalSavings } from "@/analytics/global-queries";
 import { readLatestSavingsHistory } from "@/analytics/history-queries";
 import { readPrices } from "@/analytics/queries";
@@ -9,6 +10,7 @@ import {
   buildStablewatchAssetPayload,
   type MetricValue,
 } from "@/integration/stablewatch";
+import { AutoRefresh } from "./auto-refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -181,9 +183,29 @@ function pegDistance(value: string | null) {
 }
 
 function metricLabel(metric: MetricValue) {
-  if (metric.availability === "stale") return "Stale";
-  if (metric.availability === "unavailable") return "Pending";
-  return metric.verification === "verified" ? "Verified" : "Candidate";
+  if (metric.availability === "stale") return "Source stale";
+  if (metric.availability === "unavailable") return "Awaiting coverage";
+  if (metric.verification === "verified") return "Reconciled";
+  if (metric.unit === "usd_atomic") return "External source";
+  if (metric.attribution?.includes("price")) return "Price-attributed";
+  if (metric.calculationVersion?.includes("global-usdp"))
+    return "24-chain onchain";
+  return "Finalized onchain";
+}
+
+function metricReason(reason: string | undefined) {
+  const labels: Record<string, string> = {
+    aligned_five_chain_reconciled_window_pending:
+      "Five chain windows verified; aligned global window pending",
+    chain_history_backfill_or_reconciliation_pending:
+      "History or reconciliation is still in progress",
+    source_snapshot_stale: "Source snapshot needs refresh",
+  };
+  return reason ? (labels[reason] ?? reason.replaceAll("_", " ")) : null;
+}
+
+function displayCalculationVersion(value: string | null) {
+  return value?.replace(/-candidate$/, "") ?? "Version pending";
 }
 
 function metricClass(metric: MetricValue) {
@@ -201,29 +223,45 @@ function MetricStatus({ metric }: { metric: MetricValue }) {
   );
 }
 
+function publicationLabel(status: string) {
+  if (status === "published") return "Published";
+  if (status === "deriving") return "Deriving metrics";
+  if (status === "indexing") return "Indexing history";
+  return "Queued";
+}
+
+function whole(value: number | undefined) {
+  return value === undefined ? "—" : value.toLocaleString("en-US");
+}
+
 async function dashboardData() {
   const env = parseRuntimeEnv(process.env);
   const { pool } = createDatabase(env);
   try {
-    const [global, globalUsdp, history, prices] = await Promise.all([
+    const [global, globalUsdp, history, prices, lifetime] = await Promise.all([
       readLatestGlobalSavings(pool, env.GLOBAL_SNAPSHOT_MAX_AGE_SECONDS),
       readLatestGlobalUsdpSupply(pool, env.GLOBAL_SNAPSHOT_MAX_AGE_SECONDS),
       readLatestSavingsHistory(pool),
       readPrices(pool),
+      readLifetimeDashboard(pool),
     ]);
-    return buildStablewatchAssetPayload({
-      global,
-      globalUsdp,
-      history,
-      prices,
-    });
+    return {
+      data: buildStablewatchAssetPayload({
+        global,
+        globalUsdp,
+        history,
+        prices,
+      }),
+      lifetime,
+    };
   } finally {
     await pool.end();
   }
 }
 
 export default async function Home() {
-  const data = await dashboardData();
+  const dashboard = await dashboardData();
+  const { data, lifetime } = dashboard;
   const { headline } = data.detail;
   const totalAssets = data.marketRow.tvlUsdp.value
     ? BigInt(data.marketRow.tvlUsdp.value)
@@ -248,6 +286,24 @@ export default async function Home() {
   const vaultCapture = shareOf(totalAssets, globalSupply);
   const pendingYieldShare = shareOf(pendingYield, totalAssets);
   const verifiedHistory = data.trust.verifiedHistoricalChainIds.length;
+  const publishedLifetimeChains = lifetime.filter(
+    (chain) => chain.publicationStatus === "published",
+  );
+  const lifetimeUsdpTransfers = publishedLifetimeChains.reduce(
+    (total, chain) => total + (chain.assets.usdp?.transferCount ?? 0),
+    0,
+  );
+  const lifetimeUsdpHolders = publishedLifetimeChains.reduce(
+    (total, chain) => total + (chain.assets.usdp?.activeHolders ?? 0),
+    0,
+  );
+  const lifetimeSusdpHolders = publishedLifetimeChains.reduce(
+    (total, chain) => total + (chain.assets.susdp?.activeHolders ?? 0),
+    0,
+  );
+  const hyperevmHistory = data.detail.chainBreakdown.find(
+    (chain) => chain.chainSlug === "hyperevm",
+  );
 
   return (
     <div className="app-frame">
@@ -313,6 +369,9 @@ export default async function Home() {
           <a href="#chains">
             <span aria-hidden="true">⌁</span> Chains
           </a>
+          <a href="#activity">
+            <span aria-hidden="true">↻</span> Lifetime activity
+          </a>
           <a href="#yield">
             <span aria-hidden="true">%</span> Yield
           </a>
@@ -347,11 +406,15 @@ export default async function Home() {
           <nav aria-label="Section shortcuts">
             <a href="#overview">Market</a>
             <a href="#chains">Networks</a>
+            <a href="#activity">Activity</a>
             <a href="#yield">YPO</a>
           </nav>
-          <span className="finality-pill">
-            <i /> Finalized
-          </span>
+          <div className="header-state">
+            <AutoRefresh generatedAt={data.generatedAt} />
+            <span className="finality-pill">
+              <i /> Finalized
+            </span>
+          </div>
         </header>
 
         <section className="asset-hero" id="top">
@@ -408,7 +471,7 @@ export default async function Home() {
           </article>
           <article className="metric-card featured">
             <div className="metric-card-head">
-              <p>sUSDp TVL</p>
+              <p>sUSDp vault TVL</p>
               <MetricStatus metric={headline.tvlUsdEstimate} />
             </div>
             <strong>
@@ -449,7 +512,7 @@ export default async function Home() {
                 : `${verifiedHistory}/5 chains`}
             </strong>
             <small>
-              {headline.ypoSevenDay.reason ??
+              {metricReason(headline.ypoSevenDay.reason) ??
                 "Aligned and independently reconciled"}
             </small>
           </article>
@@ -632,7 +695,7 @@ export default async function Home() {
                 <tr>
                   <th>Chain</th>
                   <th>USDp supply</th>
-                  <th>sUSDp TVL</th>
+                  <th>sUSDp vault TVL (USDp)</th>
                   <th>Share price</th>
                   <th>Estimated APY</th>
                   <th>7d YPO</th>
@@ -715,6 +778,164 @@ export default async function Home() {
                 })}
               </tbody>
             </table>
+          </div>
+        </section>
+
+        <section className="panel lifetime-panel" id="activity">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Lifetime activity</p>
+              <h2>Pre-wired for completed chain histories</h2>
+            </div>
+            <p>
+              Checkpoints update while indexing. Exact activity, holder, and
+              vault-flow metrics publish only after the full deployment range is
+              gap-free and both asset ledgers are derived.
+            </p>
+          </div>
+
+          <div className="lifetime-summary">
+            <article>
+              <small>Published histories</small>
+              <strong>{publishedLifetimeChains.length} / 4</strong>
+              <span>deployment-to-goal coverage</span>
+            </article>
+            <article>
+              <small>USDp transfers</small>
+              <strong>{whole(lifetimeUsdpTransfers)}</strong>
+              <span>published chains only</span>
+            </article>
+            <article>
+              <small>USDp holders</small>
+              <strong>{whole(lifetimeUsdpHolders)}</strong>
+              <span>chain-summed active addresses</span>
+            </article>
+            <article>
+              <small>sUSDp holders</small>
+              <strong>{whole(lifetimeSusdpHolders)}</strong>
+              <span>chain-summed active addresses</span>
+            </article>
+          </div>
+
+          <div className="chain-table-wrap">
+            <table className="chain-table lifetime-table">
+              <thead>
+                <tr>
+                  <th>Chain</th>
+                  <th>Publication</th>
+                  <th>USDp activity</th>
+                  <th>USDp holders</th>
+                  <th>sUSDp activity</th>
+                  <th>Vault flows</th>
+                  <th>Provenance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lifetime.map((chain) => {
+                  const usdp = chain.assets.usdp;
+                  const susdp = chain.assets.susdp;
+                  const published = chain.publicationStatus === "published";
+                  return (
+                    <tr key={chain.chainId}>
+                      <td>
+                        <div className="chain-name">
+                          <ChainLogo
+                            slug={chain.chainSlug}
+                            name={chain.chainName}
+                          />
+                          <div>
+                            <strong>{chain.chainName}</strong>
+                            <small>Chain ID {chain.chainId}</small>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          className={`publication-status ${chain.publicationStatus}`}
+                        >
+                          <i /> {publicationLabel(chain.publicationStatus)}
+                        </span>
+                        <div
+                          className="progress-track"
+                          aria-label={`${chain.progressPercent}% indexed`}
+                        >
+                          <span
+                            style={{ width: `${chain.progressPercent}%` }}
+                          />
+                        </div>
+                        <small>
+                          {chain.progressPercent.toFixed(2)}% scanned
+                        </small>
+                      </td>
+                      <td>
+                        <strong>{whole(usdp?.transferCount)}</strong>
+                        <small>
+                          {usdp
+                            ? `${compact(usdp.transferVolume)} USDp moved`
+                            : "Publishes after derivation"}
+                        </small>
+                      </td>
+                      <td>
+                        <strong>{whole(usdp?.activeHolders)}</strong>
+                        <small>
+                          {usdp
+                            ? `${whole(usdp.newHolders)} first-time holders`
+                            : "Zero address excluded"}
+                        </small>
+                      </td>
+                      <td>
+                        <strong>{whole(susdp?.transferCount)}</strong>
+                        <small>
+                          {susdp
+                            ? `${whole(susdp.activeHolders)} active holders`
+                            : "Publishes after derivation"}
+                        </small>
+                      </td>
+                      <td>
+                        <strong>
+                          {chain.flows
+                            ? `${whole(chain.flows.depositCount)} / ${whole(chain.flows.withdrawCount)}`
+                            : "—"}
+                        </strong>
+                        <small>deposits / withdrawals</small>
+                      </td>
+                      <td>
+                        <code>
+                          {Number(chain.fromBlock).toLocaleString()}–
+                          {Number(chain.goalBlock).toLocaleString()}
+                        </code>
+                        <small>
+                          {published && usdp
+                            ? `Complete through ${new Date(usdp.windowEnd).toLocaleDateString("en-US", { timeZone: "UTC" })}`
+                            : chain.updatedAt
+                              ? `Checkpoint ${Number(chain.nextBlock).toLocaleString()}`
+                              : "Awaiting first checkpoint"}
+                        </small>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="history-scope-note">
+            <ChainLogo slug="hyperevm" name="HyperEVM" />
+            <div>
+              <strong>HyperEVM uses a verified seven-day history window</strong>
+              <p>
+                Blocks 39,958,147–40,572,940 are gap-free and independently
+                reconciled. Lifetime replay is intentionally excluded because
+                HyperEVM&apos;s public log limits make it a materially different
+                archive workload; the dashboard does not imply lifetime coverage
+                where none exists.
+              </p>
+            </div>
+            <span>
+              {hyperevmHistory?.ypoSevenDay.value
+                ? `${decimal(hyperevmHistory.ypoSevenDay.value, 18, 4)} USDp YPO`
+                : "7d reconciliation available"}
+            </span>
           </div>
         </section>
 
@@ -844,10 +1065,94 @@ export default async function Home() {
               </p>
             </article>
           </div>
+          <div className="methodology-ledger">
+            <div className="methodology-head">
+              <span>Metric family</span>
+              <span>Source and method</span>
+              <span>Time coverage</span>
+              <span>Reviewer-facing state</span>
+            </div>
+            <div>
+              <strong>Current USDp + sUSDp state</strong>
+              <p>
+                Direct ERC-20 and ERC-4626 reads at each chain&apos;s finalized
+                block, including block hash and contract manifest.
+              </p>
+              <code>{data.detail.chainBreakdown.length} savings chains</code>
+              <span className="method-state onchain">Finalized onchain</span>
+            </div>
+            <div>
+              <strong>Global USDp supply</strong>
+              <p>
+                Sum of aligned `totalSupply()` reads from all 24 registered
+                deployments. Bridge messages are not added a second time.
+              </p>
+              <code>
+                {data.detail.usdpSupply.global.asOf
+                  ? new Date(data.detail.usdpSupply.global.asOf).toLocaleString(
+                      "en-US",
+                      { timeZone: "UTC" },
+                    )
+                  : "Snapshot pending"}
+              </code>
+              <span className="method-state onchain">24-chain onchain</span>
+            </div>
+            <div>
+              <strong>Seven-day Yield Paid Out</strong>
+              <p>
+                Accrued interest plus the change in pending yield across pinned
+                boundary states; independently integrated and reconciled.
+              </p>
+              <code>{verifiedHistory}/5 chain windows reconciled</code>
+              <span className="method-state reconciled">Reconciled</span>
+            </div>
+            <div>
+              <strong>Lifetime holders and activity</strong>
+              <p>
+                Immutable Transfer, Deposit, and Withdraw logs replayed from
+                verified deployment blocks with zero-address exclusions.
+              </p>
+              <code>
+                {publishedLifetimeChains.length}/4 histories published
+              </code>
+              <span className="method-state automatic">Auto-publishes</span>
+            </div>
+            <div>
+              <strong>USD market attribution</strong>
+              <p>
+                DIA USDp and sUSDp market observations are kept separate from
+                native onchain vault accounting.
+              </p>
+              <code>
+                {headline.usdpPriceUsd.asOf
+                  ? new Date(headline.usdpPriceUsd.asOf).toLocaleString(
+                      "en-US",
+                      { timeZone: "UTC" },
+                    )
+                  : "Market observation pending"}
+              </code>
+              <span className="method-state attributed">External source</span>
+            </div>
+          </div>
+          <div className="terminology-note">
+            <strong>What the API term “candidate” means</strong>
+            <p>
+              It never means fabricated or test data. It means the value is an
+              exact, attributable onchain observation whose broader accounting
+              methodology has not been promoted to protocol-authoritative
+              status. The dashboard replaces that internal lifecycle term with
+              the concrete evidence state: finalized onchain, price-attributed,
+              reconciled, or awaiting coverage.
+            </p>
+          </div>
           <div className="trust-footer">
             <div>
               <small>Current calculation version</small>
-              <code>{data.trust.currentCalculationVersion}</code>
+              <code>
+                {displayCalculationVersion(
+                  data.trust.currentCalculationVersion,
+                )}
+              </code>
             </div>
             <div>
               <small>Generated</small>

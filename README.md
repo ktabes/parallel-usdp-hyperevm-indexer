@@ -80,6 +80,15 @@ npm run test:network
 
 `derive-flows` builds candidate hourly/daily native-flow aggregates and seven-day deposit/withdraw participant counts from normalized events. It returns `unavailable` and writes nothing unless `verify-coverage` proves the entire requested range. Transfer logs remain linked evidence and are deliberately excluded from authoritative Deposit, Withdraw, Swap, and Redeemed flow totals.
 
+The public dashboard reads the finalized current-state tables, persisted
+reconciled YPO rows, lifetime checkpoints, activity aggregates, holder ledgers,
+and vault-flow aggregates directly from PostgreSQL. It refreshes every 60
+seconds, so an indexing row automatically moves from `Indexing history` to
+`Deriving metrics` and then `Published` without a frontend deployment or manual
+configuration change. HyperEVM remains explicitly scoped to its verified
+seven-day window; Ethereum, Base, Sonic, and Avalanche publish lifetime metrics
+only after gap-free deployment-to-goal coverage.
+
 `snapshot` captures the original HyperEVM contract state and DIA price evidence at a finalized block. `snapshot-all` captures both the five-chain savings state and the 24-chain USDp supply cycle; `snapshot-usdp` runs only the inexpensive supply cycle. `global-usdp` reads its latest coverage-gated aggregate. `range` reads coverage-gated 7d, 30d, 90d, all-time, or explicit ISO timestamp activity, holder, savings-flow, and contiguous YPO metrics. The HTTP equivalent is `/api/analytics/range?range=7d&chains=base&assets=usdp,susdp`. `history-plan` resolves independent chain blocks onto one UTC window without writing. `history-boundaries` proves both pinned historical state reads before log spending begins. `history-backfill` then uses the same immutable log, checkpoint, coverage, flow, and YPO pipeline for one or more selected savings chains; it is deliberately manual and resumable. `calculate-yield` retains the original HyperEVM-only command. The read-only analytics API is available at `/api/analytics/state`, `/api/analytics/yield`, `/api/analytics/rates`, `/api/analytics/price`, `/api/analytics/global`, `/api/analytics/usdp-supply`, `/api/analytics/range`, and `/api/analytics/history`; missing, stale, partial, candidate, or unreconciled data remains explicit rather than being synthesized. The public inspection dashboard is served at `/`, and the versioned StableWatch-oriented integration contract is served at `/api/v1/stablewatch/assets/parallel-usdp-susdp`.
 
 Network tests are opt-in and require `RUN_NETWORK_TESTS=1` plus a real `HYPEREVM_RPC_URL`. Integration tests run when `TEST_DATABASE_URL` is present and otherwise report as skipped.

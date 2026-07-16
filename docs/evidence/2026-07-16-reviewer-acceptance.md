@@ -60,27 +60,44 @@ exist; it is not synthesized from the current APY.
 - Prettier check: pass;
 - ESLint: pass;
 - TypeScript: pass;
-- tests: 114 passed, 2 environment-gated tests skipped;
+- tests: 117 passed, 2 environment-gated tests skipped;
 - Next.js production build: pass;
 - production build routes include `/api/analytics/usdp-supply`,
   `/api/analytics/range`, and
   `/api/v1/stablewatch/assets/parallel-usdp-susdp`.
 
-## Historical-lane boundary at acceptance time
+## Dashboard publication readiness
 
-These asynchronous coverage jobs are not prerequisites for the four public
-acceptance gates above, and their unfinished ranges are not represented as
-complete:
+The dashboard publication path was exercised locally against the production
+PostgreSQL database at `2026-07-16T14:29:41Z`:
 
-- HyperEVM seven-day history was healthy on its official public fallback at
-  durable next block `40519689`, with fixed completion checkpoint `40572941`.
-- Ethereum lifetime history resumed from its durable checkpoint after a dRPC
-  free-tier timeout and proved renewed advancement to next block `23261007`.
-- Sonic and Avalanche lifetime runs remain sequenced after Ethereum.
+- the page rendered with HTTP 200 and no browser console failure;
+- Ethereum and Base appeared as `Published`, with exact transfer, holder, and
+  vault-flow metrics read from their completed derived rows;
+- Sonic and Avalanche appeared as `Indexing history`, with live durable
+  checkpoint percentages and no partial activity totals;
+- HyperEVM appeared separately with its verified gap-free seven-day range and
+  `76.8069 USDp` reconciled YPO;
+- the page exposed a 60-second auto-refresh control, explicit methodology and
+  provenance, and no generic reviewer-facing `Candidate` badges.
 
-The backfill guardian continues to monitor these lanes, preserves completed
-coverage, and restarts only from durable checkpoints when a provider failure is
-terminal.
+Publication is schema-driven. A non-HyperEVM chain changes from indexing to
+deriving to published as its existing checkpoint, USDp+sUSDp activity, holder,
+and flow rows become complete. No frontend deployment or manual variable change
+is required.
+
+## Historical-lane boundary at dashboard acceptance time
+
+- HyperEVM seven-day history is complete and independently reconciled from
+  blocks `39958147` through `40572940`.
+- Base and Ethereum lifetime histories are complete and published.
+- Sonic and Avalanche lifetime histories are running concurrently and remain
+  unpublished until their full registered deployment-to-goal ranges and both
+  asset ledgers are complete.
+
+The backfill guardian continues to monitor the two unfinished lanes, preserves
+completed coverage, and restarts only from durable checkpoints when a provider
+failure is terminal.
 
 ## Reproduction
 
