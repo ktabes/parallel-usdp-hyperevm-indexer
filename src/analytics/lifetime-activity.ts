@@ -16,6 +16,18 @@ export const lifetimeChunkSizes: Record<number, number> = {
   43114: 2_048,
 };
 
+export const lifetimeBlockFetchConcurrency: Record<number, number> = {
+  1: 20,
+  8453: 20,
+  146: 40,
+  999: 1,
+  43114: 20,
+};
+
+const lifetimeBlockRpcUrls: Partial<Record<number, string>> = {
+  8453: "https://base-mainnet.public.blastapi.io",
+};
+
 export interface LifetimeActivityRange {
   adapter: SavingsChainAdapter;
   rpcUrl: string;
@@ -130,6 +142,11 @@ export async function runLifetimeActivityRange(
       retryRateLimitsIndefinitely: false,
       anchorEveryChunks: 100,
       fetchConcurrency: 1,
+      blockRpcUrl: lifetimeBlockRpcUrls[adapter.chainId],
+      blockFetchConcurrency:
+        lifetimeBlockFetchConcurrency[adapter.chainId] ?? 10,
+      blockFetchBatchSize: adapter.chainId === 8453 ? 10 : 1,
+      blockBatchConcurrency: adapter.chainId === 8453 ? 10 : 1,
       signal: options.signal,
       onProgress: options.onProgress,
     });

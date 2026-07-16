@@ -35,6 +35,9 @@ describe("indexer range planning", () => {
     expect(classifyRpcError(new Error("429 Too Many Requests"))).toBe(
       "rate-limit",
     );
+    expect(
+      classifyRpcError(new Error("exceeded compute units per second capacity")),
+    ).toBe("rate-limit");
     expect(classifyRpcError(new Error("503 fetch failed"))).toBe("transient");
     expect(classifyRpcError(new Error("invalid address"))).toBe("fatal");
     const providerLimit = new Error(

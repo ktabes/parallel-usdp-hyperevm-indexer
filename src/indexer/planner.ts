@@ -42,7 +42,9 @@ export function classifyRpcError(error: unknown): RpcErrorClass {
   if (
     message.includes("429") ||
     message.includes("too many requests") ||
-    message.includes("rate limit")
+    message.includes("rate limit") ||
+    message.includes("compute units per second") ||
+    message.includes("throughput")
   )
     return "rate-limit";
   if (

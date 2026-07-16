@@ -53,6 +53,10 @@ export interface IngestLogsOptions {
   retryRateLimitsIndefinitely?: boolean;
   anchorEveryChunks?: number;
   fetchConcurrency?: number;
+  blockRpcUrl?: string;
+  blockFetchConcurrency?: number;
+  blockFetchBatchSize?: number;
+  blockBatchConcurrency?: number;
   signal?: AbortSignal;
   onProgress?: (progress: IngestionProgress) => void;
   adapter?: SavingsChainAdapter;
@@ -165,33 +169,184 @@ async function fetchLogsWithPolicy(
   }
 }
 
-async function insertBlock(
+async function insertBlocks(
   client: PoolClient,
   chainId: number,
-  block: StoredBlock,
+  blocks: readonly StoredBlock[],
 ) {
-  const existing = await client.query<{ hash: string }>(
-    `select hash from blocks where chain_id = $1 and number = $2`,
-    [chainId, block.number.toString()],
+  if (blocks.length === 0) return;
+  const uniqueBlocks = new Map<string, StoredBlock>();
+  for (const block of blocks) uniqueBlocks.set(block.number.toString(), block);
+  const rows = [...uniqueBlocks.values()];
+  const existing = await client.query<{ number: string; hash: string }>(
+    `select number, hash from blocks
+     where chain_id = $1 and number = any($2::bigint[])`,
+    [chainId, rows.map((block) => block.number.toString())],
   );
-  const existingHash = existing.rows[0]?.hash;
-  if (existingHash && existingHash.toLowerCase() !== block.hash.toLowerCase())
-    throw new Error(
-      `Block hash drift at ${block.number}: stored ${existingHash}, RPC ${block.hash}`,
-    );
+  const existingByNumber = new Map(
+    existing.rows.map((row) => [row.number, row.hash.toLowerCase()]),
+  );
+  for (const block of rows) {
+    const existingHash = existingByNumber.get(block.number.toString());
+    if (existingHash && existingHash !== block.hash.toLowerCase())
+      throw new Error(
+        `Block hash drift at ${block.number}: stored ${existingHash}, RPC ${block.hash}`,
+      );
+  }
   await client.query(
     `insert into blocks
       (chain_id, number, hash, parent_hash, timestamp, finalized)
-     values ($1, $2, $3, $4, $5, true)
+     select $1, incoming.number, incoming.hash, incoming.parent_hash,
+            to_timestamp(incoming.timestamp_seconds), true
+       from jsonb_to_recordset($2::jsonb) as incoming(
+         number bigint, hash text, parent_hash text, timestamp_seconds bigint
+       )
      on conflict (chain_id, number) do nothing`,
     [
       chainId,
-      block.number.toString(),
-      block.hash.toLowerCase(),
-      block.parentHash.toLowerCase(),
-      new Date(Number(block.timestamp) * 1_000),
+      JSON.stringify(
+        rows.map((block) => ({
+          number: block.number.toString(),
+          hash: block.hash.toLowerCase(),
+          parent_hash: block.parentHash.toLowerCase(),
+          timestamp_seconds: block.timestamp.toString(),
+        })),
+      ),
     ],
   );
+}
+
+async function mapWithConcurrency<T, R>(
+  values: readonly T[],
+  concurrency: number,
+  mapper: (value: T) => Promise<R>,
+) {
+  const results = new Array<R>(values.length);
+  let nextIndex = 0;
+  await Promise.all(
+    Array.from(
+      { length: Math.min(Math.max(1, concurrency), values.length) },
+      async () => {
+        while (nextIndex < values.length) {
+          const index = nextIndex;
+          nextIndex += 1;
+          results[index] = await mapper(values[index]!);
+        }
+      },
+    ),
+  );
+  return results;
+}
+
+async function fetchBlockWithPolicy(
+  client: EvmClient,
+  blockNumber: bigint,
+  counters: IngestionCounters,
+  maxRetries = 8,
+) {
+  let attempt = 0;
+  while (true) {
+    try {
+      return asStoredBlock(await client.getBlock({ blockNumber }));
+    } catch (error) {
+      const errorClass = classifyRpcError(error);
+      if (!shouldRetryRpcError(errorClass, attempt, maxRetries, false))
+        throw error;
+      attempt += 1;
+      counters.rpcRetries += 1;
+      await wait(retryDelayMs(attempt, errorClass));
+    }
+  }
+}
+
+interface RpcBlockHeader {
+  number: string | null;
+  hash: Hex | null;
+  parentHash: Hex;
+  timestamp: string;
+}
+
+interface RpcBatchResponse {
+  id?: number;
+  result?: RpcBlockHeader;
+  error?: { message?: string };
+}
+
+async function fetchBlockBatchWithPolicy(
+  rpcUrl: string,
+  blockNumbers: readonly bigint[],
+  counters: IngestionCounters,
+  maxRetries = 8,
+) {
+  let attempt = 0;
+  while (true) {
+    try {
+      const response = await fetch(rpcUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          blockNumbers.map((blockNumber, index) => ({
+            jsonrpc: "2.0",
+            id: index + 1,
+            method: "eth_getBlockByNumber",
+            params: [`0x${blockNumber.toString(16)}`, false],
+          })),
+        ),
+      });
+      const payload = (await response.json()) as
+        RpcBatchResponse[] | RpcBatchResponse;
+      if (!response.ok || !Array.isArray(payload))
+        throw new Error(
+          !Array.isArray(payload) && payload.error?.message
+            ? payload.error.message
+            : `Block batch RPC returned HTTP ${response.status}`,
+        );
+      const byId = new Map(payload.map((row) => [row.id, row]));
+      return blockNumbers.map((expectedNumber, index): StoredBlock => {
+        const row = byId.get(index + 1);
+        if (row?.error)
+          throw new Error(row.error.message ?? "Block batch RPC failed");
+        const block = row?.result;
+        if (!block?.number || !block.hash)
+          throw new Error("Block batch RPC returned an incomplete block");
+        const number = BigInt(block.number);
+        if (number !== expectedNumber)
+          throw new Error(
+            `Block batch RPC returned ${number} for requested block ${expectedNumber}`,
+          );
+        return {
+          number,
+          hash: block.hash,
+          parentHash: block.parentHash,
+          timestamp: BigInt(block.timestamp),
+        };
+      });
+    } catch (error) {
+      const errorClass = classifyRpcError(error);
+      if (!shouldRetryRpcError(errorClass, attempt, maxRetries, false))
+        throw error;
+      attempt += 1;
+      counters.rpcRetries += 1;
+      await wait(retryDelayMs(attempt, errorClass));
+    }
+  }
+}
+
+async function fetchBlocksBatched(
+  rpcUrl: string,
+  blockNumbers: readonly bigint[],
+  batchSize: number,
+  batchConcurrency: number,
+  counters: IngestionCounters,
+) {
+  const batches: bigint[][] = [];
+  for (let index = 0; index < blockNumbers.length; index += batchSize)
+    batches.push(blockNumbers.slice(index, index + batchSize));
+  return (
+    await mapWithConcurrency(batches, batchConcurrency, (batch) =>
+      fetchBlockBatchWithPolicy(rpcUrl, batch, counters),
+    )
+  ).flat();
 }
 
 async function persistChunk(
@@ -208,11 +363,12 @@ async function persistChunk(
   const database = await pool.connect();
   try {
     await database.query("begin");
-    for (const block of blocksByNumber.values())
-      await insertBlock(database, chainId, block);
-    if (anchor) await insertBlock(database, chainId, anchor);
+    await insertBlocks(database, chainId, [
+      ...blocksByNumber.values(),
+      ...(anchor ? [anchor] : []),
+    ]);
 
-    for (const log of logs) {
+    const incomingLogs = logs.map((log) => {
       if (
         log.blockNumber === null ||
         !log.blockHash ||
@@ -222,35 +378,57 @@ async function persistChunk(
       )
         throw new Error("RPC returned an incomplete mined log");
       const decoderVersion = decoderVersionForAddress(chainId, log.address);
-      const inserted = await database.query<{ id: string }>(
-        `insert into raw_logs
+      return {
+        block_number: log.blockNumber.toString(),
+        block_hash: log.blockHash.toLowerCase(),
+        transaction_hash: log.transactionHash.toLowerCase(),
+        transaction_index: Number(log.transactionIndex),
+        log_index: Number(log.logIndex),
+        contract_address: log.address.toLowerCase(),
+        topics: log.topics,
+        data: log.data,
+        removed: Boolean(log.removed),
+        decoder_version: decoderVersion,
+      };
+    });
+    const inserted = await database.query<{
+      id: string;
+      transaction_hash: string;
+      log_index: number;
+    }>(
+      `insert into raw_logs
           (chain_id, block_number, block_hash, transaction_hash,
            transaction_index, log_index, contract_address, topics, data,
            removed, decoder_version, run_id)
-         values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12)
+         select $1, incoming.block_number, incoming.block_hash,
+                incoming.transaction_hash, incoming.transaction_index,
+                incoming.log_index, incoming.contract_address,
+                incoming.topics, incoming.data, incoming.removed,
+                incoming.decoder_version, $3
+           from jsonb_to_recordset($2::jsonb) as incoming(
+             block_number bigint, block_hash text, transaction_hash text,
+             transaction_index integer, log_index integer,
+             contract_address text, topics jsonb, data text,
+             removed boolean, decoder_version text
+           )
          on conflict (chain_id, transaction_hash, log_index) do nothing
-         returning id`,
-        [
-          chainId,
-          log.blockNumber.toString(),
-          log.blockHash.toLowerCase(),
-          log.transactionHash.toLowerCase(),
-          Number(log.transactionIndex),
-          Number(log.logIndex),
-          log.address.toLowerCase(),
-          JSON.stringify(log.topics),
-          log.data,
-          Boolean(log.removed),
-          decoderVersion,
-          runId,
-        ],
+         returning id, transaction_hash, log_index`,
+      [chainId, JSON.stringify(incomingLogs), runId],
+    );
+    counters.rawLogsInserted += inserted.rows.length;
+    counters.duplicateRawLogs += logs.length - inserted.rows.length;
+    const insertedByKey = new Map(
+      inserted.rows.map((row) => [
+        `${row.transaction_hash.toLowerCase()}:${row.log_index}`,
+        row.id,
+      ]),
+    );
+    const decodedEvents = [];
+    for (const log of logs) {
+      const rawLogId = insertedByKey.get(
+        `${log.transactionHash?.toLowerCase()}:${Number(log.logIndex)}`,
       );
-      const rawLogId = inserted.rows[0]?.id;
-      if (!rawLogId) {
-        counters.duplicateRawLogs += 1;
-        continue;
-      }
-      counters.rawLogsInserted += 1;
+      if (!rawLogId) continue;
       const decoded = decodeProtocolLog(chainId, {
         address: log.address,
         data: log.data,
@@ -261,26 +439,35 @@ async function persistChunk(
           counters.decodeFailures += 1;
         continue;
       }
+      decodedEvents.push({
+        raw_log_id: rawLogId,
+        block_number: log.blockNumber!.toString(),
+        transaction_hash: log.transactionHash!.toLowerCase(),
+        log_index: Number(log.logIndex),
+        contract_role: decoded.contractRole,
+        event_name: decoded.eventName,
+        payload: decoded.payload,
+        decoder_version: decoded.decoderVersion,
+      });
+    }
+    if (decodedEvents.length > 0)
       await database.query(
         `insert into protocol_events
           (raw_log_id, chain_id, block_number, transaction_hash, log_index,
            contract_role, event_name, payload, decoder_version)
-         values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9)
+         select incoming.raw_log_id, $1, incoming.block_number,
+                incoming.transaction_hash, incoming.log_index,
+                incoming.contract_role, incoming.event_name,
+                incoming.payload, incoming.decoder_version
+           from jsonb_to_recordset($2::jsonb) as incoming(
+             raw_log_id bigint, block_number bigint, transaction_hash text,
+             log_index integer, contract_role text, event_name text,
+             payload jsonb, decoder_version text
+           )
          on conflict (raw_log_id) do nothing`,
-        [
-          rawLogId,
-          chainId,
-          log.blockNumber.toString(),
-          log.transactionHash.toLowerCase(),
-          Number(log.logIndex),
-          decoded.contractRole,
-          decoded.eventName,
-          JSON.stringify(decoded.payload),
-          decoded.decoderVersion,
-        ],
+        [chainId, JSON.stringify(decodedEvents)],
       );
-      counters.eventsDecoded += 1;
-    }
+    counters.eventsDecoded += decodedEvents.length;
 
     await database.query(
       `insert into indexer_coverage
@@ -365,6 +552,20 @@ export async function ingestLogs(
     minRequestIntervalMs: options.requestIntervalMs ?? 650,
     retryCount: 0,
   });
+  const blockFetchConcurrency = Math.max(1, options.blockFetchConcurrency ?? 1);
+  const blockFetchBatchSize = Math.max(1, options.blockFetchBatchSize ?? 1);
+  const blockBatchConcurrency = Math.max(1, options.blockBatchConcurrency ?? 1);
+  const blockRequestIntervalMs = Math.max(
+    25,
+    Math.floor((options.requestIntervalMs ?? 650) / blockFetchConcurrency),
+  );
+  const blockClient =
+    blockFetchConcurrency === 1
+      ? client
+      : createEvmClient(chain, options.blockRpcUrl ?? options.rpcUrl, {
+          minRequestIntervalMs: Math.max(25, blockRequestIntervalMs),
+          retryCount: 0,
+        });
   const finalizedBlock =
     options.adapter?.finality === "rpc-finalized"
       ? await client.getBlock({ blockTag: "finalized" })
@@ -489,17 +690,34 @@ export async function ingestLogs(
         const fetched = fetchedResult.value;
         const planned = plannedRanges[index]!;
         activeChunkSize = fetched.chunkSize;
-        const blocksByNumber = new Map<bigint, StoredBlock>();
-        for (const blockNumber of new Set(
-          fetched.logs
-            .map((log) => log.blockNumber)
-            .filter((number): number is bigint => number !== null),
-        )) {
-          blocksByNumber.set(
+        const blockNumbers = [
+          ...new Set(
+            fetched.logs
+              .map((log) => log.blockNumber)
+              .filter((number): number is bigint => number !== null),
+          ),
+        ];
+        const fetchedBlocks =
+          blockFetchBatchSize > 1
+            ? await fetchBlocksBatched(
+                options.blockRpcUrl ?? options.rpcUrl,
+                blockNumbers,
+                blockFetchBatchSize,
+                blockBatchConcurrency,
+                counters,
+              )
+            : await mapWithConcurrency(
+                blockNumbers,
+                blockFetchConcurrency,
+                async (blockNumber) =>
+                  fetchBlockWithPolicy(blockClient, blockNumber, counters),
+              );
+        const blocksByNumber = new Map(
+          blockNumbers.map((blockNumber, index) => [
             blockNumber,
-            asStoredBlock(await client.getBlock({ blockNumber })),
-          );
-        }
+            fetchedBlocks[index]!,
+          ]),
+        );
         const isFinalChunk = fetched.range.toBlock === options.toBlock;
         const shouldAnchor =
           isFinalChunk || (counters.chunks + 1) % anchorEveryChunks === 0;
