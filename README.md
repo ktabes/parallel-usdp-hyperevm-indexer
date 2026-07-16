@@ -4,7 +4,7 @@ An independent, auditable indexer and analytics surface for Parallel V3 USDp and
 
 ## Current status
 
-Current-state adapters are live for all five official sUSDp vault chains. The historical pipeline now supports chain-aware decoding, aligned UTC range planning, resumable log ingestion, boundary snapshots, flows, and candidate YPO for Ethereum, Base, Sonic, HyperEVM, and Avalanche. Historical values remain unavailable until the relevant range is fully backfilled and independently reconciled; global USDp supply remains partial until all 24 deployments and bridge accounting are verified.
+Current-state adapters are live for all five official sUSDp vault chains. A separate current-supply lane now reads all 24 official USDp deployments with finalized block, bytecode, metadata, timing, and component provenance. Its sum remains a bridge-accounting candidate until peer and message reconciliation promotes it. The historical pipeline supports chain-aware decoding, aligned UTC range planning, resumable log ingestion, boundary snapshots, flows, and candidate YPO for Ethereum, Base, Sonic, HyperEVM, and Avalanche.
 
 ## Product boundary
 
@@ -49,6 +49,7 @@ npm run cli -- derive-flows --from-block FROM --to-block TO
 npm run cli -- snapshot
 npm run cli -- snapshot --block FINALIZED_BLOCK
 npm run cli -- snapshot-all
+npm run cli -- snapshot-usdp
 npm run cli -- history-plan --days 7
 npm run cli -- history-boundaries --days 7
 npm run cli -- history-backfill --chain base --days 7
@@ -68,6 +69,7 @@ npm run cli -- yield
 npm run cli -- rates
 npm run cli -- price
 npm run cli -- global
+npm run cli -- global-usdp
 npm run test:unit
 npm run test:fixtures
 npm run test:integration
@@ -76,7 +78,7 @@ npm run test:network
 
 `derive-flows` builds candidate hourly/daily native-flow aggregates and seven-day deposit/withdraw participant counts from normalized events. It returns `unavailable` and writes nothing unless `verify-coverage` proves the entire requested range. Transfer logs remain linked evidence and are deliberately excluded from authoritative Deposit, Withdraw, Swap, and Redeemed flow totals.
 
-`snapshot` captures the original HyperEVM contract state and DIA price evidence at a finalized block. `snapshot-all` captures finalized current state for every configured official sUSDp chain, persists chain token/vault evidence, and writes a component-linked global savings snapshot. `history-plan` resolves independent chain blocks onto one UTC window without writing. `history-boundaries` proves both pinned historical state reads before log spending begins. `history-backfill` then uses the same immutable log, checkpoint, coverage, flow, and YPO pipeline for one or more selected savings chains; it is deliberately manual and resumable. `calculate-yield` retains the original HyperEVM-only command. The read-only analytics API is available at `/api/analytics/state`, `/api/analytics/yield`, `/api/analytics/rates`, `/api/analytics/price`, `/api/analytics/global`, and `/api/analytics/history`; missing, stale, partial, or unreconciled data remains explicit rather than being synthesized. The public inspection dashboard is served at `/`, and the versioned StableWatch-oriented integration contract is served at `/api/v1/stablewatch/assets/parallel-usdp-susdp`.
+`snapshot` captures the original HyperEVM contract state and DIA price evidence at a finalized block. `snapshot-all` captures both the five-chain savings state and the 24-chain USDp supply cycle; `snapshot-usdp` runs only the inexpensive supply cycle. `global-usdp` reads its latest coverage-gated aggregate. `history-plan` resolves independent chain blocks onto one UTC window without writing. `history-boundaries` proves both pinned historical state reads before log spending begins. `history-backfill` then uses the same immutable log, checkpoint, coverage, flow, and YPO pipeline for one or more selected savings chains; it is deliberately manual and resumable. `calculate-yield` retains the original HyperEVM-only command. The read-only analytics API is available at `/api/analytics/state`, `/api/analytics/yield`, `/api/analytics/rates`, `/api/analytics/price`, `/api/analytics/global`, `/api/analytics/usdp-supply`, and `/api/analytics/history`; missing, stale, partial, candidate, or unreconciled data remains explicit rather than being synthesized. The public inspection dashboard is served at `/`, and the versioned StableWatch-oriented integration contract is served at `/api/v1/stablewatch/assets/parallel-usdp-susdp`.
 
 Network tests are opt-in and require `RUN_NETWORK_TESTS=1` plus a real `HYPEREVM_RPC_URL`. Integration tests run when `TEST_DATABASE_URL` is present and otherwise report as skipped.
 
@@ -114,6 +116,14 @@ history and unavailable optional evidence remain explicit warnings.
 On Railway, set `RUN_SEVEN_DAY_BACKFILL=1` to start the worker beside the web service. A PostgreSQL advisory lock prevents duplicate workers, recoverable RPC failures restart from the durable checkpoint, and `/api/indexer/status` exposes the checkpoint, stored row counts, and recent runs. `RPC_REQUEST_INTERVAL_MS` can tune the pace, but the conservative `1500` default is recommended for the public endpoint. Set the flag back to `0` after the initial week completes if continuous catch-up is not wanted.
 
 For cross-chain current state, configure `ETHEREUM_RPC_URL`, `BASE_RPC_URL`, `SONIC_RPC_URL`, and `AVALANCHE_RPC_URL` alongside the existing `HYPEREVM_RPC_URL`, then set `RUN_MULTICHAIN_SNAPSHOTS=1`. Ethereum, Base, Sonic, and Avalanche use their RPC `finalized` block tag; HyperEVM retains its configured confirmation lag. The worker uses one Multicall state read per non-HyperEVM chain, records missing or failed RPCs as partial coverage, and never takes down the web service because one chain is unavailable. `GLOBAL_SNAPSHOT_MAX_AGE_SECONDS` defaults to `3600` so provider-specific Ethereum/Base L1 finality delay is not mistaken for a stopped adapter; exact component block ages remain visible.
+
+The same worker captures current USDp supply on all 24 registered chains. It
+uses the savings-chain URLs where configured and public chain defaults for the
+remaining distribution chains. `USDP_CHAIN_RPC_URLS` can override any chain as
+a JSON object keyed by numeric chain ID. `USDP_SUPPLY_ALIGNMENT_MAX_SKEW_SECONDS`
+defaults to `1800`; components outside that block-time window are excluded and
+reported rather than silently added. Public-provider failures degrade only that
+cycle's coverage.
 
 Cross-chain historical backfills are never started by web-service deployment. Plan the aligned range first, capture both historical boundaries, and then run one bounded chain backfill. Savings history requests only the sUSDp vault logs needed for Deposit, Withdraw, Accrued, rate, pause, and share-transfer evidence; high-volume USDp token transfers belong to the later standalone USDp distribution/bridge lane. `--log-rpc-url` can assign a separate historical log provider after the configured chain RPC proves the pinned state boundaries. `--window-end` pins the common Unix end timestamp so a later invocation resumes the same scope instead of silently planning a moving seven-day window. The default chain set for planning is Ethereum, Base, Sonic, and Avalanche; add `--chain hyperevm` explicitly when its historical provider budget is available. Candidate chain YPO is stored with exact component provenance but is excluded from a global YPO total until independent rate reconciliation promotes it to verified.
 

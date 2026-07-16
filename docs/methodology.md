@@ -17,6 +17,15 @@ Ethereum, Base, Sonic, and Avalanche current-state adapters use the RPC `finaliz
 
 Chain-local token and vault reads remain the evidence units. A global sUSDp snapshot links to every included chain component and reports expected, included, missing, stale, and invalid chains. Global sUSDp assets and YPO are additive only across aligned valid components. The headline estimated APY is weighted by chain-local `totalAssets`; rates are never summed. USDp supply across the five savings chains is explicitly a partial distribution metric until all 24 official USDp deployments and V3 bridge accounting are verified.
 
+The standalone USDp supply cycle reads bytecode, `name`, `symbol`, `decimals`,
+and `totalSupply` at one finalized block per registered deployment. Component
+block timestamps must fall inside the configured UTC alignment skew. The
+candidate global value is the sum of included `totalSupply` values; bridge
+sends and receives are not added because the OFT path burns on the source and
+mints on the destination. Even complete 24-chain RPC coverage remains marked
+`candidate` until bridge contracts, peers, and message GUID lifecycles are
+reconciled. The API exposes candidate and verified totals separately.
+
 ## Historical windows
 
 A cross-chain history job first chooses one UTC end time no later than the oldest configured chain's finalized timestamp, then resolves the first block at or after the common start and end timestamps independently on each chain. Both pinned boundary states must succeed before log ingestion begins. Each chain receives its own checkpoint and complete-coverage proof. Savings-history log queries target sUSDp only; unrelated high-volume USDp transfers are deferred to the standalone USDp distribution and bridge-accounting lane. Candidate YPO uses `Accrued` events in `(start_block,end_block]` plus the change in pending yield between the two exact boundary snapshots. A global YPO total includes only independently reconciled `verified` intervals within the alignment tolerance; candidate components remain visible but unsummed.

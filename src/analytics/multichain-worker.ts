@@ -2,6 +2,7 @@ import { parseRuntimeEnv } from "@/config/env";
 import { createDatabase } from "@/db/client";
 import { providerErrorMessage } from "@/rpc/errors";
 import { captureConfiguredSavingsSnapshots } from "./multichain-snapshots";
+import { captureGlobalUsdpSupply } from "./usdp-supply";
 
 const WORKER_LOCK_ID = 999_700_002;
 const LOCK_RETRY_INTERVAL_MS = 5_000;
@@ -54,6 +55,7 @@ export async function runMultichainSnapshotWorker() {
       const startedAt = new Date();
       try {
         const result = await captureConfiguredSavingsSnapshots(pool, env);
+        const usdpSupply = await captureGlobalUsdpSupply(pool, env);
         console.log(
           JSON.stringify({
             event: "multichain-snapshot-cycle",
@@ -67,6 +69,10 @@ export async function runMultichainSnapshotWorker() {
               reason: "reason" in chain ? chain.reason : undefined,
             })),
             globalSnapshotId: result.global.globalSnapshotId,
+            globalUsdpSupplySnapshotId: usdpSupply.globalSnapshotId,
+            globalUsdpSupplyStatus: usdpSupply.status,
+            globalUsdpSupplyIncludedChains:
+              usdpSupply.coverage.includedChainCount,
           }),
         );
       } catch (error) {

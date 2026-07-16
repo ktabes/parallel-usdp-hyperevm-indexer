@@ -644,6 +644,139 @@ export const globalSavingsSnapshotComponents = pgTable(
   ],
 );
 
+export const usdpSupplySnapshotEvidence = pgTable(
+  "usdp_supply_snapshot_evidence",
+  {
+    assetSnapshotId: bigint("asset_snapshot_id", { mode: "bigint" })
+      .primaryKey()
+      .references(() => assetChainSnapshots.id, { onDelete: "cascade" }),
+    codeHash: text("code_hash").notNull(),
+    observedName: text("observed_name").notNull(),
+    observedSymbol: text("observed_symbol").notNull(),
+    observedDecimals: integer("observed_decimals").notNull(),
+    metadataVerified: boolean("metadata_verified").notNull(),
+    finalityMode: text("finality_mode").notNull(),
+    rpcSource: text("rpc_source").notNull(),
+    createdAt,
+  },
+  (table) => [
+    check(
+      "usdp_supply_evidence_code_hash_check",
+      sql`${table.codeHash} ~ '^0x[0-9a-f]{64}$'`,
+    ),
+    check(
+      "usdp_supply_evidence_decimals_check",
+      sql`${table.observedDecimals} between 0 and 255`,
+    ),
+    check(
+      "usdp_supply_evidence_finality_check",
+      sql`${table.finalityMode} in ('rpc-finalized', 'confirmation-lag', 'confirmation-lag-fallback')`,
+    ),
+    check(
+      "usdp_supply_evidence_rpc_source_check",
+      sql`${table.rpcSource} in ('chain-override', 'savings-chain-override', 'public-default')`,
+    ),
+  ],
+);
+
+export const globalUsdpSupplySnapshots = pgTable(
+  "global_usdp_supply_snapshots",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    asOf: timestamp("as_of", { withTimezone: true }).notNull(),
+    expectedChainCount: integer("expected_chain_count").notNull(),
+    includedChainCount: integer("included_chain_count").notNull(),
+    coverageStatus: text("coverage_status").notNull(),
+    accountingStatus: text("accounting_status").notNull(),
+    candidateTotalSupply: text("candidate_total_supply").notNull(),
+    verifiedTotalSupply: text("verified_total_supply"),
+    oldestComponentTimestamp: timestamp("oldest_component_timestamp", {
+      withTimezone: true,
+    }),
+    newestComponentTimestamp: timestamp("newest_component_timestamp", {
+      withTimezone: true,
+    }),
+    maximumComponentAgeSeconds: bigint("maximum_component_age_seconds", {
+      mode: "bigint",
+    }),
+    componentSkewSeconds: bigint("component_skew_seconds", {
+      mode: "bigint",
+    }),
+    alignmentMaximumSkewSeconds: integer(
+      "alignment_maximum_skew_seconds",
+    ).notNull(),
+    includedChainIds: jsonb("included_chain_ids")
+      .$type<number[]>()
+      .notNull()
+      .default([]),
+    missingChainIds: jsonb("missing_chain_ids")
+      .$type<number[]>()
+      .notNull()
+      .default([]),
+    staleChainIds: jsonb("stale_chain_ids")
+      .$type<number[]>()
+      .notNull()
+      .default([]),
+    failedChainIds: jsonb("failed_chain_ids")
+      .$type<number[]>()
+      .notNull()
+      .default([]),
+    manifestVersion: text("manifest_version").notNull(),
+    calculationVersion: text("calculation_version").notNull(),
+    createdAt,
+  },
+  (table) => [
+    index("global_usdp_supply_as_of_idx").on(table.asOf),
+    check(
+      "global_usdp_supply_coverage_check",
+      sql`${table.coverageStatus} in ('complete', 'partial', 'unavailable')`,
+    ),
+    check(
+      "global_usdp_supply_accounting_check",
+      sql`${table.accountingStatus} in ('candidate', 'verified')`,
+    ),
+    check(
+      "global_usdp_supply_counts_check",
+      sql`${table.expectedChainCount} >= 0
+        and ${table.includedChainCount} >= 0
+        and ${table.includedChainCount} <= ${table.expectedChainCount}`,
+    ),
+    check(
+      "global_usdp_supply_amounts_check",
+      sql`${table.candidateTotalSupply} ~ '^[0-9]+$'
+        and (${table.verifiedTotalSupply} is null
+          or ${table.verifiedTotalSupply} ~ '^[0-9]+$')`,
+    ),
+  ],
+);
+
+export const globalUsdpSupplySnapshotComponents = pgTable(
+  "global_usdp_supply_snapshot_components",
+  {
+    globalSnapshotId: bigint("global_snapshot_id", { mode: "bigint" })
+      .notNull()
+      .references(() => globalUsdpSupplySnapshots.id, { onDelete: "cascade" }),
+    assetSnapshotId: bigint("asset_snapshot_id", { mode: "bigint" })
+      .notNull()
+      .references(() => assetChainSnapshots.id, { onDelete: "restrict" }),
+    chainId: integer("chain_id").notNull(),
+    included: boolean("included").notNull(),
+    exclusionReason: text("exclusion_reason"),
+  },
+  (table) => [
+    primaryKey({ columns: [table.globalSnapshotId, table.assetSnapshotId] }),
+    uniqueIndex("global_usdp_supply_components_chain_unique").on(
+      table.globalSnapshotId,
+      table.chainId,
+    ),
+    check(
+      "global_usdp_supply_component_reason_check",
+      sql`(${table.included} and ${table.exclusionReason} is null)
+        or (not ${table.included} and ${table.exclusionReason} is not null)`,
+    ),
+  ],
+);
+
 export const vaultSnapshots = pgTable(
   "vault_snapshots",
   {

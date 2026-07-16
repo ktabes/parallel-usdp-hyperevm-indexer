@@ -21,6 +21,7 @@ describe("parseRuntimeEnv", () => {
       PRICE_SOURCE: "unconfigured",
       REFRESH_INTERVAL_SECONDS: 30,
       GLOBAL_SNAPSHOT_MAX_AGE_SECONDS: 3_600,
+      USDP_SUPPLY_ALIGNMENT_MAX_SKEW_SECONDS: 1_800,
     });
   });
 
@@ -62,6 +63,23 @@ describe("parseRuntimeEnv", () => {
     expect(() =>
       parseRuntimeEnv({ ...validEnvironment, SONIC_RPC_URL: "not-a-url" }),
     ).toThrow(/SONIC_RPC_URL/);
+  });
+
+  it("parses a numeric-chain USDp RPC override map", () => {
+    expect(
+      parseRuntimeEnv({
+        ...validEnvironment,
+        USDP_CHAIN_RPC_URLS: JSON.stringify({
+          137: "https://polygon-rpc.example",
+        }),
+      }).USDP_CHAIN_RPC_URLS,
+    ).toEqual({ 137: "https://polygon-rpc.example" });
+    expect(() =>
+      parseRuntimeEnv({
+        ...validEnvironment,
+        USDP_CHAIN_RPC_URLS: '{"polygon":"not-a-url"}',
+      }),
+    ).toThrow(/USDP_CHAIN_RPC_URLS/);
   });
 
   it("accepts an optional Alchemy key without exposing it in a URL", () => {

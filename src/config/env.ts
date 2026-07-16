@@ -26,6 +26,24 @@ const booleanFlag = z
   .default("0")
   .transform((value) => value === "1");
 
+const optionalRpcUrlMap = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return value;
+    if (value.trim() === "") return undefined;
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      return value;
+    }
+  },
+  z
+    .record(
+      z.string().regex(/^\d+$/, "RPC map keys must be numeric chain IDs"),
+      z.url("RPC map values must be valid URLs"),
+    )
+    .optional(),
+);
+
 export const runtimeEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -38,6 +56,7 @@ export const runtimeEnvSchema = z.object({
   BASE_RPC_URL: optionalUrl("BASE_RPC_URL"),
   SONIC_RPC_URL: optionalUrl("SONIC_RPC_URL"),
   AVALANCHE_RPC_URL: optionalUrl("AVALANCHE_RPC_URL"),
+  USDP_CHAIN_RPC_URLS: optionalRpcUrlMap,
   ALCHEMY_API_KEY: optionalSecret,
   ONFINALITY_API_KEY: optionalSecret,
   RUN_SEVEN_DAY_BACKFILL: booleanFlag,
@@ -66,6 +85,11 @@ export const runtimeEnvSchema = z.object({
     30,
     86_400,
   ).default(3_600),
+  USDP_SUPPLY_ALIGNMENT_MAX_SKEW_SECONDS: integerFromString(
+    "USDP_SUPPLY_ALIGNMENT_MAX_SKEW_SECONDS",
+    60,
+    86_400,
+  ).default(1_800),
 });
 
 export type RuntimeEnv = z.infer<typeof runtimeEnvSchema>;

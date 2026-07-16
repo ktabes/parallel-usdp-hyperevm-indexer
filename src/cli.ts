@@ -12,6 +12,8 @@ import { calculateYieldForRange } from "@/analytics/yield";
 import { readLatestGlobalSavings } from "@/analytics/global-queries";
 import { readLatestSavingsHistory } from "@/analytics/history-queries";
 import { captureConfiguredSavingsSnapshots } from "@/analytics/multichain-snapshots";
+import { captureGlobalUsdpSupply } from "@/analytics/usdp-supply";
+import { readLatestGlobalUsdpSupply } from "@/analytics/usdp-supply-queries";
 import {
   captureSavingsChainSnapshot,
   syncParallelAssetRegistry,
@@ -137,6 +139,10 @@ async function configCheck() {
         priceSource: env.PRICE_SOURCE,
         refreshIntervalSeconds: env.REFRESH_INTERVAL_SECONDS,
         globalSnapshotMaximumAgeSeconds: env.GLOBAL_SNAPSHOT_MAX_AGE_SECONDS,
+        usdpSupplyAlignmentMaximumSkewSeconds:
+          env.USDP_SUPPLY_ALIGNMENT_MAX_SKEW_SECONDS,
+        usdpSupplyRpcOverrideCount: Object.keys(env.USDP_CHAIN_RPC_URLS ?? {})
+          .length,
         configuredSavingsChains: {
           ethereum: Boolean(env.ETHEREUM_RPC_URL),
           base: Boolean(env.BASE_RPC_URL),
@@ -390,12 +396,20 @@ async function captureMultichainSnapshots() {
   const env = parseRuntimeEnv(process.env);
   const { pool } = createDatabase(env);
   try {
+    const savings = await captureConfiguredSavingsSnapshots(pool, env);
+    const usdpSupply = await captureGlobalUsdpSupply(pool, env);
+    console.log(JSON.stringify({ savings, usdpSupply }, null, 2));
+  } finally {
+    await pool.end();
+  }
+}
+
+async function captureUsdpSupply() {
+  const env = parseRuntimeEnv(process.env);
+  const { pool } = createDatabase(env);
+  try {
     console.log(
-      JSON.stringify(
-        await captureConfiguredSavingsSnapshots(pool, env),
-        null,
-        2,
-      ),
+      JSON.stringify(await captureGlobalUsdpSupply(pool, env), null, 2),
     );
   } finally {
     await pool.end();
@@ -658,6 +672,25 @@ async function showGlobalSavings() {
   }
 }
 
+async function showGlobalUsdpSupply() {
+  const env = parseRuntimeEnv(process.env);
+  const { pool } = createDatabase(env);
+  try {
+    console.log(
+      JSON.stringify(
+        await readLatestGlobalUsdpSupply(
+          pool,
+          env.GLOBAL_SNAPSHOT_MAX_AGE_SECONDS,
+        ),
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await pool.end();
+  }
+}
+
 async function showSavingsHistory() {
   const env = parseRuntimeEnv(process.env);
   const { pool } = createDatabase(env);
@@ -827,6 +860,9 @@ async function main() {
     case "snapshot-all":
       await captureMultichainSnapshots();
       return;
+    case "snapshot-usdp":
+      await captureUsdpSupply();
+      return;
     case "history-plan":
       await showSavingsHistoryPlan();
       return;
@@ -857,12 +893,15 @@ async function main() {
     case "global":
       await showGlobalSavings();
       return;
+    case "global-usdp":
+      await showGlobalUsdpSupply();
+      return;
     case "history":
       await showSavingsHistory();
       return;
     default:
       throw new Error(
-        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|verify|holders-replay|derive-flows|snapshot|snapshot-all|history-plan|history-boundaries|history-backfill|history-reconcile|lifetime-plan|lifetime-backfill|calculate-yield|state|yield|rates|price|global|history>",
+        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|verify|holders-replay|derive-flows|snapshot|snapshot-all|snapshot-usdp|history-plan|history-boundaries|history-backfill|history-reconcile|lifetime-plan|lifetime-backfill|calculate-yield|state|yield|rates|price|global|global-usdp|history>",
       );
   }
 }
@@ -878,6 +917,7 @@ main().catch((error: unknown) => {
       process.env.BASE_RPC_URL,
       process.env.SONIC_RPC_URL,
       process.env.AVALANCHE_RPC_URL,
+      process.env.USDP_CHAIN_RPC_URLS,
     ]),
   );
   process.exitCode = 1;

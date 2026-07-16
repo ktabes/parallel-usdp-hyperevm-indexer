@@ -147,4 +147,23 @@ describe("initial migration contract", () => {
       'CREATE UNIQUE INDEX "asset_activity_provenance_unique"',
     );
   });
+
+  it("persists aligned 24-chain USDp supply evidence and coverage", async () => {
+    const migration = await readFile(
+      "drizzle/0009_fast_cannonball.sql",
+      "utf8",
+    );
+
+    expect(migration).toContain('CREATE TABLE "usdp_supply_snapshot_evidence"');
+    expect(migration).toContain('CREATE TABLE "global_usdp_supply_snapshots"');
+    expect(migration).toContain(
+      'CREATE TABLE "global_usdp_supply_snapshot_components"',
+    );
+    expect(migration).toContain('"candidate_total_supply" text NOT NULL');
+    expect(migration).toContain('"verified_total_supply" text');
+    expect(migration).toContain('"metadata_verified" boolean NOT NULL');
+    expect(migration).toContain(
+      'CREATE UNIQUE INDEX "global_usdp_supply_components_chain_unique"',
+    );
+  });
 });

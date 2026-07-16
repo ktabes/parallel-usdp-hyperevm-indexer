@@ -46,6 +46,22 @@ The Phase 6 historical migration adds normalized interval evidence:
 
 The immutable `raw_logs`, `blocks`, `indexer_coverage`, and checkpoints remain shared across chains. Decoder identity is keyed by `(chain_id, contract_address)` because the same address can represent different Parallel contracts on different chains.
 
+The 24-chain current USDp supply extension reuses `asset_chain_snapshots` and
+adds only the evidence and aggregation layers that were missing:
+
+- `usdp_supply_snapshot_evidence` proves bytecode, exact onchain name/symbol/
+  decimals, finality mode, and non-secret RPC source for each component.
+- `global_usdp_supply_snapshots` stores the aligned candidate sum, coverage,
+  failed/stale/missing chains, time skew, and a nullable verified total.
+- `global_usdp_supply_snapshot_components` links every successful component,
+  including excluded invalid or misaligned reads, to the aggregate that judged
+  it.
+
+`candidate_total_supply` is never copied into `verified_total_supply` merely
+because all 24 RPC calls succeeded. Promotion remains gated on bridge topology
+and message reconciliation, so current distribution coverage and omnichain
+accounting verification stay separate facts.
+
 ## Rules
 
 - EVM addresses and hashes are stored lowercase after boundary validation.
