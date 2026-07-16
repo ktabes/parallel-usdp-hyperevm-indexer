@@ -341,15 +341,18 @@ async function showCoverage() {
 
 async function deriveFlows() {
   const env = parseRuntimeEnv(process.env);
+  const adapter = requestedAdapter();
   const { pool } = createDatabase(env);
   try {
     console.log(
       JSON.stringify(
         await rebuildFlowAnalytics({
           pool,
+          chainId: adapter.chainId,
           scope: indexerScope(),
           fromBlock: BigInt(requiredArgument("--from-block")),
           toBlock: BigInt(requiredArgument("--to-block")),
+          manifestVersion: `parallel-assets-${adapter.chainSlug}-lifetime-v1-candidate`,
         }),
         null,
         2,
