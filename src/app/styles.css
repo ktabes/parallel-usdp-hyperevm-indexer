@@ -223,6 +223,13 @@ h1 span {
 .chain-logo-base {
   border-radius: 8px;
 }
+.chain-logo-sonic {
+  padding: 3px;
+  background: #050505;
+}
+.chain-logo-hyperevm {
+  padding: 5px;
+}
 .live-state {
   color: #9aa39b;
   font-size: 0.72rem;
