@@ -1094,6 +1094,13 @@ h1 span {
   font-size: 1.1rem;
   letter-spacing: -0.025em;
 }
+.distribution-usd-value {
+  display: block;
+  margin-top: 5px;
+  color: var(--green);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
 .asset-distribution-copy p {
   max-width: 410px;
   margin: 9px 0 0;
@@ -1108,7 +1115,7 @@ h1 span {
 }
 .asset-distribution-legend > div {
   display: grid;
-  grid-template-columns: 8px 1fr auto;
+  grid-template-columns: 8px minmax(70px, 1fr) auto;
   align-items: center;
   gap: 9px;
   font-size: 0.62rem;
@@ -1118,12 +1125,23 @@ h1 span {
   height: 8px;
   border-radius: 2px;
 }
-.asset-distribution-legend span {
+.asset-distribution-legend .distribution-chain-name {
   color: #8d968e;
 }
-.asset-distribution-legend strong {
+.distribution-chain-values {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  text-align: right;
+}
+.asset-distribution-legend .distribution-chain-values strong {
   color: #dce1db;
   font-size: 0.64rem;
+}
+.asset-distribution-legend .distribution-chain-values small {
+  color: var(--green);
+  font-size: 0.54rem;
+  white-space: nowrap;
 }
 .section-heading {
   display: flex;

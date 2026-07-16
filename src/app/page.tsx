@@ -202,6 +202,22 @@ function price(value: string | null) {
   }).format(amount);
 }
 
+function usdValue(
+  amount: string | bigint,
+  usdpPriceUsd: string | null,
+  notation: "standard" | "compact" = "standard",
+) {
+  if (usdpPriceUsd === null) return "USD unavailable";
+  const value = (BigInt(amount) * BigInt(usdpPriceUsd)) / 10n ** 18n;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation,
+    minimumFractionDigits: notation === "standard" ? 2 : 0,
+    maximumFractionDigits: notation === "standard" ? 2 : 2,
+  }).format(Number(value) / 1e18);
+}
+
 function displayCalculationVersion(value: string | null) {
   return value?.replace(/-candidate$/, "") ?? "Version pending";
 }
@@ -710,7 +726,13 @@ export default async function Home() {
                 >
                   <span>
                     <strong>USDp</strong>
-                    <small>5 chains</small>
+                    <small>
+                      {usdValue(
+                        savingsSupply,
+                        headline.usdpPriceUsd.value,
+                        "compact",
+                      )}
+                    </small>
                   </span>
                 </div>
                 <div className="asset-distribution-copy">
@@ -718,6 +740,9 @@ export default async function Home() {
                   <strong>
                     {decimal(savingsSupply.toString(), 18, 2)} USDp observed
                   </strong>
+                  <span className="distribution-usd-value">
+                    {usdValue(savingsSupply, headline.usdpPriceUsd.value)}
+                  </span>
                   <p>
                     Each segment represents a chain&apos;s share of USDp supply
                     across the five sUSDp-enabled networks.
@@ -731,13 +756,24 @@ export default async function Home() {
                           background: chainColors[chain.chainSlug] ?? "#c9ff4b",
                         }}
                       />
-                      <span>{chain.chainName}</span>
-                      <strong>
-                        {shareOf(chain.usdpTotalSupply, savingsSupply).toFixed(
-                          2,
-                        )}
-                        %
-                      </strong>
+                      <span className="distribution-chain-name">
+                        {chain.chainName}
+                      </span>
+                      <span className="distribution-chain-values">
+                        <strong>
+                          {shareOf(
+                            chain.usdpTotalSupply,
+                            savingsSupply,
+                          ).toFixed(2)}
+                          %
+                        </strong>
+                        <small>
+                          {usdValue(
+                            chain.usdpTotalSupply,
+                            headline.usdpPriceUsd.value,
+                          )}
+                        </small>
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -837,12 +873,21 @@ export default async function Home() {
                 >
                   <span>
                     <strong>sUSDp</strong>
-                    <small>TVL</small>
+                    <small>
+                      {usdValue(
+                        totalAssets,
+                        headline.usdpPriceUsd.value,
+                        "compact",
+                      )}
+                    </small>
                   </span>
                 </div>
                 <div className="asset-distribution-copy">
                   <small>Vault TVL distribution</small>
                   <strong>{decimal(totalAssets.toString(), 18, 2)} USDp</strong>
+                  <span className="distribution-usd-value">
+                    {usdValue(totalAssets, headline.usdpPriceUsd.value)}
+                  </span>
                   <p>
                     Each segment represents the USDp assets held by sUSDp vaults
                     on that chain.
@@ -856,13 +901,23 @@ export default async function Home() {
                           background: chainColors[chain.chainSlug] ?? "#c9ff4b",
                         }}
                       />
-                      <span>{chain.chainName}</span>
-                      <strong>
-                        {shareOf(chain.susdpTotalAssets, totalAssets).toFixed(
-                          2,
-                        )}
-                        %
-                      </strong>
+                      <span className="distribution-chain-name">
+                        {chain.chainName}
+                      </span>
+                      <span className="distribution-chain-values">
+                        <strong>
+                          {shareOf(chain.susdpTotalAssets, totalAssets).toFixed(
+                            2,
+                          )}
+                          %
+                        </strong>
+                        <small>
+                          {usdValue(
+                            chain.susdpTotalAssets,
+                            headline.usdpPriceUsd.value,
+                          )}
+                        </small>
+                      </span>
                     </div>
                   ))}
                 </div>
