@@ -991,6 +991,53 @@ h1 span {
 .trust-panel {
   padding: 32px;
 }
+.asset-chain-state {
+  margin-top: 48px;
+}
+.chain-state-heading {
+  padding: 0 6px;
+}
+.asset-chain-panels {
+  display: grid;
+  gap: 28px;
+}
+.asset-chain-panel {
+  margin-top: 0;
+  padding: 32px;
+}
+.asset-chain-panel-heading {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+.asset-chain-panel-heading > div {
+  min-width: 0;
+}
+.asset-chain-panel-heading p,
+.asset-chain-panel-heading h2 {
+  margin: 0;
+}
+.asset-chain-panel-heading p {
+  color: #9aa39b;
+  font-size: 0.62rem;
+  font-weight: 650;
+}
+.asset-chain-panel-heading h2 {
+  margin-top: 4px;
+  font-size: 1.2rem;
+  letter-spacing: -0.025em;
+}
+.asset-chain-panel-heading > span {
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: #7f8880;
+  font-size: 0.58rem;
+}
 .section-heading {
   display: flex;
   align-items: flex-end;
@@ -1017,6 +1064,12 @@ h1 span {
   width: 100%;
   border-collapse: collapse;
   min-width: 1080px;
+}
+.usdp-chain-table {
+  min-width: 720px;
+}
+.susdp-chain-table {
+  min-width: 1120px;
 }
 .chain-table th {
   padding: 12px 14px;
@@ -1946,11 +1999,19 @@ footer > div:last-child {
     flex-direction: column;
   }
   .chain-panel,
+  .asset-chain-panel,
   .lifetime-panel,
   .yield-panel,
   .coverage-panel,
   .trust-panel {
     padding: 22px;
+  }
+  .asset-chain-panel-heading {
+    grid-template-columns: auto 1fr;
+  }
+  .asset-chain-panel-heading > span {
+    grid-column: 2;
+    justify-self: start;
   }
   .trust-grid {
     grid-template-columns: 1fr;

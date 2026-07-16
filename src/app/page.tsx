@@ -643,110 +643,203 @@ export default async function Home() {
           </div>
         </section>
 
-        <section className="panel chain-panel" id="chains">
-          <div className="section-heading">
+        <section className="asset-chain-state" id="chains">
+          <div className="section-heading chain-state-heading">
             <div>
               <p className="eyebrow">Current state</p>
-              <h2>USDp liquidity and sUSDp yield by chain</h2>
+              <h2>Chain-level fundamentals by asset</h2>
             </div>
             <p>
-              Every component is a finalized contract read with its own block,
-              manifest, and freshness record.
+              USDp stablecoin supply and sUSDp savings-vault accounting are
+              intentionally separated so each asset has a complete, readable
+              chain view.
             </p>
           </div>
 
-          <div className="chain-table-wrap">
-            <table className="chain-table">
-              <thead>
-                <tr>
-                  <th>Chain</th>
-                  <th>USDp supply</th>
-                  <th>sUSDp vault TVL (USDp)</th>
-                  <th>Share price</th>
-                  <th>Estimated APY</th>
-                  <th>7d YPO</th>
-                  <th>Block</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.detail.chainBreakdown.map((chain) => {
-                  const share =
-                    totalAssets > 0n
-                      ? Number(
-                          (BigInt(chain.susdpTotalAssets) * 10_000n) /
-                            totalAssets,
-                        ) / 100
-                      : 0;
-                  return (
-                    <tr key={chain.chainId}>
-                      <td>
-                        <a
-                          className="chain-name chain-detail-link"
-                          href={`/chains/${chain.chainSlug}`}
-                        >
-                          <ChainLogo
-                            slug={chain.chainSlug}
-                            name={chain.chainName}
-                          />
-                          <div>
-                            <strong>{chain.chainName}</strong>
-                            <small>Chain ID {chain.chainId}</small>
-                          </div>
-                        </a>
-                      </td>
-                      <td>
-                        <strong>{compact(chain.usdpTotalSupply)} USDp</strong>
-                        <small>
-                          {shareOf(
-                            chain.usdpTotalSupply,
-                            savingsSupply,
-                          ).toFixed(1)}
-                          % of observed supply
-                        </small>
-                      </td>
-                      <td>
-                        <strong>{compact(chain.susdpTotalAssets)} USDp</strong>
-                        <div
-                          className="share-bar"
-                          aria-label={`${share}% of total TVL`}
-                        >
-                          <span style={{ width: `${Math.max(share, 0.5)}%` }} />
-                        </div>
-                      </td>
-                      <td>{decimal(chain.susdpSharePriceUsdp, 18, 4)} USDp</td>
-                      <td>{percentage(chain.estimatedApy)}</td>
-                      <td>
-                        <span
-                          className={`table-status ${metricClass(chain.ypoSevenDay)}`}
-                        >
-                          {chain.ypoSevenDay.value
-                            ? `${decimal(chain.ypoSevenDay.value, 18, 3)} USDp`
-                            : "—"}
-                        </span>
-                      </td>
-                      <td>
-                        <code>
-                          {Number(chain.block.number).toLocaleString()}
-                        </code>
-                        <small>
-                          {new Date(chain.block.timestamp).toLocaleString(
-                            "en-US",
-                            {
-                              timeZone: "UTC",
-                              month: "short",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            },
-                          )}{" "}
-                          UTC
-                        </small>
-                      </td>
+          <div className="asset-chain-panels">
+            <article className="panel asset-chain-panel">
+              <div className="asset-chain-panel-heading">
+                <AssetLogo asset="usdp" size={34} />
+                <div>
+                  <p>USDp</p>
+                  <h2>Stablecoin supply by chain</h2>
+                </div>
+                <span>Underlying asset</span>
+              </div>
+              <div className="chain-table-wrap">
+                <table className="chain-table usdp-chain-table">
+                  <thead>
+                    <tr>
+                      <th>Chain</th>
+                      <th>USDp supply</th>
+                      <th>Share of savings-chain supply</th>
+                      <th>Source block</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {data.detail.chainBreakdown.map((chain) => {
+                      const supplyShare = shareOf(
+                        chain.usdpTotalSupply,
+                        savingsSupply,
+                      );
+                      return (
+                        <tr key={chain.chainId}>
+                          <td>
+                            <a
+                              className="chain-name chain-detail-link"
+                              href={`/chains/${chain.chainSlug}`}
+                            >
+                              <ChainLogo
+                                slug={chain.chainSlug}
+                                name={chain.chainName}
+                              />
+                              <div>
+                                <strong>{chain.chainName}</strong>
+                                <small>Chain ID {chain.chainId}</small>
+                              </div>
+                            </a>
+                          </td>
+                          <td>
+                            <strong>
+                              {decimal(chain.usdpTotalSupply, 18, 2)} USDp
+                            </strong>
+                          </td>
+                          <td>
+                            <strong>{supplyShare.toFixed(2)}%</strong>
+                            <div
+                              className="share-bar"
+                              aria-label={`${supplyShare}% of observed savings-chain supply`}
+                            >
+                              <span
+                                style={{
+                                  width: `${Math.max(supplyShare, 0.5)}%`,
+                                }}
+                              />
+                            </div>
+                          </td>
+                          <td>
+                            <code>
+                              {Number(chain.block.number).toLocaleString()}
+                            </code>
+                            <small>
+                              {new Date(chain.block.timestamp).toLocaleString(
+                                "en-US",
+                                {
+                                  timeZone: "UTC",
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}{" "}
+                              UTC
+                            </small>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article className="panel asset-chain-panel">
+              <div className="asset-chain-panel-heading">
+                <AssetLogo asset="susdp" size={34} />
+                <div>
+                  <p>sUSDp</p>
+                  <h2>Savings supply, TVL, and yield by chain</h2>
+                </div>
+                <span>Yield-bearing share</span>
+              </div>
+              <div className="chain-table-wrap">
+                <table className="chain-table susdp-chain-table">
+                  <thead>
+                    <tr>
+                      <th>Chain</th>
+                      <th>sUSDp supply</th>
+                      <th>Vault TVL (USDp)</th>
+                      <th>Share value</th>
+                      <th>Estimated APY</th>
+                      <th>7d YPO</th>
+                      <th>Source block</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.detail.chainBreakdown.map((chain) => {
+                      const tvlShare =
+                        totalAssets > 0n
+                          ? Number(
+                              (BigInt(chain.susdpTotalAssets) * 10_000n) /
+                                totalAssets,
+                            ) / 100
+                          : 0;
+                      return (
+                        <tr key={chain.chainId}>
+                          <td>
+                            <a
+                              className="chain-name chain-detail-link"
+                              href={`/chains/${chain.chainSlug}`}
+                            >
+                              <ChainLogo
+                                slug={chain.chainSlug}
+                                name={chain.chainName}
+                              />
+                              <div>
+                                <strong>{chain.chainName}</strong>
+                                <small>Chain ID {chain.chainId}</small>
+                              </div>
+                            </a>
+                          </td>
+                          <td>
+                            <strong>
+                              {decimal(chain.susdpTotalSupply, 18, 2)} sUSDp
+                            </strong>
+                          </td>
+                          <td>
+                            <strong>
+                              {decimal(chain.susdpTotalAssets, 18, 2)} USDp
+                            </strong>
+                            <small>{tvlShare.toFixed(2)}% of total TVL</small>
+                          </td>
+                          <td>
+                            {decimal(chain.susdpSharePriceUsdp, 18, 4)} USDp
+                          </td>
+                          <td>{percentage(chain.estimatedApy)}</td>
+                          <td>
+                            <span
+                              className={`table-status ${metricClass(chain.ypoSevenDay)}`}
+                            >
+                              {chain.ypoSevenDay.value
+                                ? `${decimal(chain.ypoSevenDay.value, 18, 3)} USDp`
+                                : "—"}
+                            </span>
+                          </td>
+                          <td>
+                            <code>
+                              {Number(chain.block.number).toLocaleString()}
+                            </code>
+                            <small>
+                              {new Date(chain.block.timestamp).toLocaleString(
+                                "en-US",
+                                {
+                                  timeZone: "UTC",
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}{" "}
+                              UTC
+                            </small>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </article>
           </div>
         </section>
 
