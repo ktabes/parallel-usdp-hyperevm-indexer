@@ -42,4 +42,15 @@ describe("dashboard lifetime readiness", () => {
       }),
     ).toBe("published");
   });
+
+  it("labels a completed bounded window without implying lifetime coverage", () => {
+    expect(
+      lifetimePublicationStatus({
+        nextBlock: 200n,
+        goalBlock: 199n,
+        publishedAssets: 0,
+        coverageKind: "window",
+      }),
+    ).toBe("window_only");
+  });
 });

@@ -6,6 +6,7 @@ export const lifetimeDashboardRanges = [
     chainSlug: "ethereum",
     chainName: "Ethereum",
     scope: "parallel-assets-ethereum-lifetime-v1",
+    coverageKind: "lifetime",
     fromBlock: 22_639_007n,
     goalBlock: 25_542_442n,
   },
@@ -14,6 +15,7 @@ export const lifetimeDashboardRanges = [
     chainSlug: "base",
     chainName: "Base",
     scope: "parallel-assets-base-lifetime-v1",
+    coverageKind: "lifetime",
     fromBlock: 31_200_853n,
     goalBlock: 48_691_161n,
   },
@@ -22,6 +24,7 @@ export const lifetimeDashboardRanges = [
     chainSlug: "sonic",
     chainName: "Sonic",
     scope: "parallel-assets-sonic-lifetime-v1",
+    coverageKind: "lifetime",
     fromBlock: 32_199_398n,
     goalBlock: 76_014_565n,
   },
@@ -30,8 +33,18 @@ export const lifetimeDashboardRanges = [
     chainSlug: "avalanche",
     chainName: "Avalanche",
     scope: "parallel-assets-avalanche-lifetime-v1",
+    coverageKind: "lifetime",
     fromBlock: 63_383_232n,
     goalBlock: 90_424_055n,
+  },
+  {
+    chainId: 999,
+    chainSlug: "hyperevm",
+    chainName: "HyperEVM",
+    scope: "parallel-savings-hyperevm-1783558757-1784163557-v1",
+    coverageKind: "window",
+    fromBlock: 39_958_147n,
+    goalBlock: 40_572_940n,
   },
 ] as const;
 
@@ -63,12 +76,14 @@ export interface LifetimeDashboardRow {
   chainSlug: string;
   chainName: string;
   scope: string;
+  coverageKind: "lifetime" | "window";
   fromBlock: string;
   goalBlock: string;
   nextBlock: string | null;
   updatedAt: string | null;
   progressPercent: number;
-  publicationStatus: "not_started" | "indexing" | "deriving" | "published";
+  publicationStatus:
+    "not_started" | "indexing" | "deriving" | "published" | "window_only";
   publishedAssets: number;
   assets: Partial<Record<"usdp" | "susdp", LifetimeActivityMetric>>;
   flows: LifetimeFlowMetric | null;
@@ -123,7 +138,14 @@ export function lifetimePublicationStatus(options: {
   nextBlock: bigint | null;
   goalBlock: bigint;
   publishedAssets: number;
+  coverageKind?: "lifetime" | "window";
 }): LifetimeDashboardRow["publicationStatus"] {
+  if (
+    options.coverageKind === "window" &&
+    options.nextBlock !== null &&
+    options.nextBlock > options.goalBlock
+  )
+    return "window_only";
   if (options.publishedAssets >= 2) return "published";
   if (options.nextBlock !== null && options.nextBlock > options.goalBlock)
     return "deriving";
@@ -215,6 +237,7 @@ export async function readLifetimeDashboard(pool: Pool) {
       chainSlug: range.chainSlug,
       chainName: range.chainName,
       scope: range.scope,
+      coverageKind: range.coverageKind,
       fromBlock: range.fromBlock.toString(),
       goalBlock: range.goalBlock.toString(),
       nextBlock: nextBlock?.toString() ?? null,
@@ -228,6 +251,7 @@ export async function readLifetimeDashboard(pool: Pool) {
         nextBlock,
         goalBlock: range.goalBlock,
         publishedAssets: assetRows.length,
+        coverageKind: range.coverageKind,
       }),
       publishedAssets: assetRows.length,
       assets,

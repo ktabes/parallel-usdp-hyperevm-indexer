@@ -188,6 +188,7 @@ function metricClass(metric: MetricValue) {
 
 function publicationLabel(status: string) {
   if (status === "published") return "Published";
+  if (status === "window_only") return "7-day history";
   if (status === "deriving") return "Deriving metrics";
   if (status === "indexing") return "Indexing history";
   return "Queued";
@@ -657,7 +658,10 @@ export default async function Home() {
                   return (
                     <tr key={chain.chainId}>
                       <td>
-                        <div className="chain-name">
+                        <a
+                          className="chain-name chain-detail-link"
+                          href={`/chains/${chain.chainSlug}`}
+                        >
                           <ChainLogo
                             slug={chain.chainSlug}
                             name={chain.chainName}
@@ -666,7 +670,7 @@ export default async function Home() {
                             <strong>{chain.chainName}</strong>
                             <small>Chain ID {chain.chainId}</small>
                           </div>
-                        </div>
+                        </a>
                       </td>
                       <td>
                         <strong>{compact(chain.usdpTotalSupply)} USDp</strong>
@@ -727,21 +731,22 @@ export default async function Home() {
         <section className="panel lifetime-panel" id="activity">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Lifetime activity</p>
-              <h2>Complete deployment-to-goal histories</h2>
+              <p className="eyebrow">Historical activity</p>
+              <h2>Activity and holders by chain</h2>
             </div>
             <p>
-              Exact activity, holder, and vault-flow metrics publish only after
-              the full deployment range is gap-free and both asset ledgers are
-              derived. All four supported lifetime scopes now satisfy that gate.
+              Four chains have complete deployment-to-goal histories. HyperEVM
+              is shown in the same table with its verified seven-day range so
+              the difference in coverage is visible without separating the chain
+              from the rest of the product.
             </p>
           </div>
 
           <div className="lifetime-summary">
             <article>
-              <small>Published histories</small>
+              <small>Lifetime histories</small>
               <strong>{publishedLifetimeChains.length} / 4</strong>
-              <span>deployment-to-goal coverage</span>
+              <span>plus HyperEVM&apos;s verified 7-day window</span>
             </article>
             <article>
               <small>USDp transfers</small>
@@ -781,7 +786,10 @@ export default async function Home() {
                   return (
                     <tr key={chain.chainId}>
                       <td>
-                        <div className="chain-name">
+                        <a
+                          className="chain-name chain-detail-link"
+                          href={`/chains/${chain.chainSlug}`}
+                        >
                           <ChainLogo
                             slug={chain.chainSlug}
                             name={chain.chainName}
@@ -790,7 +798,7 @@ export default async function Home() {
                             <strong>{chain.chainName}</strong>
                             <small>Chain ID {chain.chainId}</small>
                           </div>
-                        </div>
+                        </a>
                       </td>
                       <td>
                         <span
@@ -815,7 +823,9 @@ export default async function Home() {
                         <small>
                           {usdp
                             ? `${compact(usdp.transferVolume)} USDp moved`
-                            : "Publishes after derivation"}
+                            : chain.coverageKind === "window"
+                              ? "Lifetime transfers not indexed"
+                              : "Publishes after derivation"}
                         </small>
                       </td>
                       <td>
@@ -823,7 +833,9 @@ export default async function Home() {
                         <small>
                           {usdp
                             ? `${whole(usdp.newHolders)} first-time holders`
-                            : "Zero address excluded"}
+                            : chain.coverageKind === "window"
+                              ? "Lifetime holders not indexed"
+                              : "Zero address excluded"}
                         </small>
                       </td>
                       <td>
@@ -831,7 +843,9 @@ export default async function Home() {
                         <small>
                           {susdp
                             ? `${whole(susdp.activeHolders)} active holders`
-                            : "Publishes after derivation"}
+                            : chain.coverageKind === "window"
+                              ? "Seven-day YPO available"
+                              : "Publishes after derivation"}
                         </small>
                       </td>
                       <td>
@@ -849,10 +863,13 @@ export default async function Home() {
                         </code>
                         <small>
                           {published && usdp
-                            ? `Complete through ${new Date(usdp.windowEnd).toLocaleDateString("en-US", { timeZone: "UTC" })}`
-                            : chain.updatedAt
-                              ? `Checkpoint ${Number(chain.nextBlock).toLocaleString()}`
-                              : "Awaiting first checkpoint"}
+                            ? `${new Date(usdp.windowStart).toLocaleDateString("en-US", { timeZone: "UTC" })}–${new Date(usdp.windowEnd).toLocaleDateString("en-US", { timeZone: "UTC" })}`
+                            : chain.coverageKind === "window" &&
+                                hyperevmHistory?.history
+                              ? `${new Date(hyperevmHistory.history.windowStart).toLocaleDateString("en-US", { timeZone: "UTC" })}–${new Date(hyperevmHistory.history.windowEnd).toLocaleDateString("en-US", { timeZone: "UTC" })}`
+                              : chain.updatedAt
+                                ? `Checkpoint ${Number(chain.nextBlock).toLocaleString()}`
+                                : "Awaiting first checkpoint"}
                         </small>
                       </td>
                     </tr>
@@ -860,25 +877,6 @@ export default async function Home() {
                 })}
               </tbody>
             </table>
-          </div>
-
-          <div className="history-scope-note">
-            <ChainLogo slug="hyperevm" name="HyperEVM" />
-            <div>
-              <strong>HyperEVM uses a verified seven-day history window</strong>
-              <p>
-                Blocks 39,958,147–40,572,940 are gap-free and independently
-                reconciled. Lifetime replay is intentionally excluded because
-                HyperEVM&apos;s public log limits make it a materially different
-                archive workload; the dashboard does not imply lifetime coverage
-                where none exists.
-              </p>
-            </div>
-            <span>
-              {hyperevmHistory?.ypoSevenDay.value
-                ? `${decimal(hyperevmHistory.ypoSevenDay.value, 18, 4)} USDp YPO`
-                : "7d reconciliation available"}
-            </span>
           </div>
         </section>
 
