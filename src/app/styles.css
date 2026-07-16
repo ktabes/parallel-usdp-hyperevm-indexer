@@ -98,9 +98,13 @@ code {
   font-size: 0.7rem;
   font-weight: 800;
 }
+.ticker-token {
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+}
 .ticker-token.savings {
-  color: #07100a;
-  background: var(--lime);
+  background: transparent;
 }
 .ticker-network {
   border-radius: 8px;
@@ -370,7 +374,8 @@ code {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  border: 1px solid rgb(255 255 255 / 12%);
+  overflow: hidden;
+  border: 0;
   font-size: 1.2rem;
   font-weight: 900;
   box-shadow: 0 12px 42px rgb(0 0 0 / 45%);
@@ -378,15 +383,18 @@ code {
 .token-back {
   left: 0;
   top: 2px;
-  color: #aab2a9;
-  background: #1c1c1c;
+  background: transparent;
 }
 .token-front {
   right: 0;
   bottom: 0;
-  color: #101307;
-  background: var(--lime);
-  border-color: rgb(255 255 255 / 18%);
+  background: transparent;
+}
+.asset-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 .eyebrow {
   margin: 0 0 10px;
@@ -611,17 +619,15 @@ h1 span {
   height: 42px;
   display: grid;
   place-items: center;
-  border: 1px solid #495047;
+  overflow: hidden;
+  border: 0;
   border-radius: 50%;
-  background: #222823;
-  color: #eef2ec;
+  background: transparent;
   font-size: 0.9rem;
   font-weight: 900;
 }
 .susdp-profile .profile-token {
-  border-color: #d6ff73;
-  background: var(--lime);
-  color: #111608;
+  background: transparent;
 }
 .asset-profile-head p,
 .asset-profile-head h3 {

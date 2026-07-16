@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { readLatestGlobalSavings } from "@/analytics/global-queries";
 import { readLatestSavingsHistory } from "@/analytics/history-queries";
 import { readPrices } from "@/analytics/queries";
@@ -17,6 +18,27 @@ const chainColors: Record<string, string> = {
   hyperevm: "#97fce4",
   avalanche: "#e84142",
 };
+
+function AssetLogo({
+  asset,
+  size,
+}: {
+  asset: "usdp" | "susdp";
+  size: number;
+}) {
+  const symbol = asset === "usdp" ? "USDp" : "sUSDp";
+
+  return (
+    <Image
+      className={`asset-logo asset-logo-${asset}`}
+      src={`/tokens/${asset}.png`}
+      alt={`${symbol} logo`}
+      width={size}
+      height={size}
+      priority
+    />
+  );
+}
 
 function ChainLogo({ slug, name }: { slug: string; name: string }) {
   const common = {
@@ -235,7 +257,9 @@ export default async function Home() {
         </a>
         <div className="market-ticker" aria-label="Current asset metrics">
           <div>
-            <span className="ticker-token">$</span>
+            <span className="ticker-token">
+              <AssetLogo asset="usdp" size={28} />
+            </span>
             <p>
               <strong>USDp</strong>
               <small>{price(headline.usdpPriceUsd.value)}</small>
@@ -243,7 +267,9 @@ export default async function Home() {
             <i>{pegDistance(headline.usdpPriceUsd.value)}</i>
           </div>
           <div>
-            <span className="ticker-token savings">P</span>
+            <span className="ticker-token savings">
+              <AssetLogo asset="susdp" size={28} />
+            </span>
             <p>
               <strong>sUSDp</strong>
               <small>{compact(totalAssets.toString())} TVL</small>
@@ -327,8 +353,12 @@ export default async function Home() {
         <section className="asset-hero" id="top">
           <div className="asset-identity">
             <div className="asset-lockup" aria-hidden="true">
-              <span className="token token-back">$</span>
-              <span className="token token-front">P</span>
+              <span className="token token-back">
+                <AssetLogo asset="usdp" size={60} />
+              </span>
+              <span className="token token-front">
+                <AssetLogo asset="susdp" size={60} />
+              </span>
             </div>
             <div>
               <p className="eyebrow">Parallel V3 · Cross-chain savings</p>
@@ -446,7 +476,9 @@ export default async function Home() {
           <div className="asset-story-grid">
             <article className="asset-profile usdp-profile">
               <div className="asset-profile-head">
-                <div className="profile-token">$</div>
+                <div className="profile-token">
+                  <AssetLogo asset="usdp" size={42} />
+                </div>
                 <div>
                   <p>Parallel stablecoin</p>
                   <h3>USDp</h3>
@@ -520,7 +552,9 @@ export default async function Home() {
 
             <article className="asset-profile susdp-profile">
               <div className="asset-profile-head">
-                <div className="profile-token">P</div>
+                <div className="profile-token">
+                  <AssetLogo asset="susdp" size={42} />
+                </div>
                 <div>
                   <p>ERC-4626 savings token</p>
                   <h3>sUSDp</h3>
