@@ -61,6 +61,14 @@ function historyDays() {
   return value;
 }
 
+function historyWindowEnd() {
+  const value = argument("--window-end");
+  if (value === undefined) return undefined;
+  if (!/^\d+$/.test(value) || BigInt(value) < 1n)
+    throw new Error("--window-end must be a positive Unix timestamp");
+  return BigInt(value);
+}
+
 function requestedHistoryChains() {
   const value =
     argument("--chains") ??
@@ -366,6 +374,7 @@ async function showSavingsHistoryPlan() {
     env,
     requestedHistoryChains(),
     historyDays(),
+    historyWindowEnd(),
   );
   console.log(
     JSON.stringify(
@@ -396,6 +405,7 @@ async function captureSavingsHistoryBoundaries() {
     env,
     requestedHistoryChains(),
     historyDays(),
+    historyWindowEnd(),
   );
   const { pool } = createDatabase(env);
   try {
@@ -437,6 +447,7 @@ async function backfillSavingsHistory() {
     env,
     requestedHistoryChains(),
     historyDays(),
+    historyWindowEnd(),
   );
   const chunkSizeValue = argument("--chunk-size");
   const chunkSize = chunkSizeValue ? Number(chunkSizeValue) : undefined;

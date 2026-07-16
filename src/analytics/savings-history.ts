@@ -67,6 +67,7 @@ export async function resolveAlignedSavingsHistoryRanges(
   env: RuntimeEnv,
   chainSlugs: readonly string[],
   days = 7,
+  pinnedWindowEnd?: bigint,
 ) {
   if (!Number.isInteger(days) || days < 1 || days > 365)
     throw new Error("History days must be an integer between 1 and 365");
@@ -90,11 +91,16 @@ export async function resolveAlignedSavingsHistoryRanges(
       ),
     ),
   );
-  const targetWindowEnd = chains.reduce(
+  const latestCommonWindowEnd = chains.reduce(
     (oldest, chain) =>
       chain.finalizedTimestamp < oldest ? chain.finalizedTimestamp : oldest,
     chains[0]!.finalizedTimestamp,
   );
+  if (pinnedWindowEnd !== undefined && pinnedWindowEnd > latestCommonWindowEnd)
+    throw new Error(
+      `Pinned history window end ${pinnedWindowEnd} exceeds latest common finalized timestamp ${latestCommonWindowEnd}`,
+    );
+  const targetWindowEnd = pinnedWindowEnd ?? latestCommonWindowEnd;
   const targetWindowStart = targetWindowEnd - BigInt(days) * 24n * 60n * 60n;
 
   return Promise.all(
