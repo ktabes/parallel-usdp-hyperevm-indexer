@@ -3,6 +3,7 @@ import { createPublicClient, http, type Chain, type Transport } from "viem";
 export interface EvmClientOptions {
   minRequestIntervalMs?: number;
   retryCount?: number;
+  timeoutMs?: number;
 }
 
 function rateLimitedTransport(
@@ -35,7 +36,7 @@ export function createEvmClient(
   options: EvmClientOptions = {},
 ) {
   const transport = http(rpcUrl, {
-    timeout: 20_000,
+    timeout: options.timeoutMs ?? 20_000,
     retryCount: options.retryCount ?? 2,
     retryDelay: 500,
   });

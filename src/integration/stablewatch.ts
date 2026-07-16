@@ -214,10 +214,21 @@ export function buildStablewatchAssetPayload({
   const priceAvailable = Boolean(prices.usdp?.priceUsdAtomic);
   const priceStale = prices.usdp?.stale ?? true;
   const priceAsOf = iso(prices.blockTimestamp);
+  const globalUsdpCoverage = globalUsdp?.coverage;
+  const globalUsdpCoverageComplete = Boolean(
+    globalUsdpCoverage?.expectedChainCount &&
+    globalUsdpCoverage.includedChainCount ===
+      globalUsdpCoverage.expectedChainCount &&
+    (globalUsdpCoverage.missingChainIds?.length ?? 0) === 0 &&
+    (globalUsdpCoverage.staleChainIds?.length ?? 0) === 0 &&
+    (globalUsdpCoverage.failedChainIds?.length ?? 0) === 0,
+  );
   const globalUsdpValue =
-    globalUsdp?.accountingStatus === "verified"
+    globalUsdpCoverageComplete && globalUsdp?.accountingStatus === "verified"
       ? globalUsdp.verifiedTotalSupply
-      : globalUsdp?.candidateTotalSupply;
+      : globalUsdpCoverageComplete
+        ? globalUsdp?.candidateTotalSupply
+        : null;
   let globalUsdpSupply = globalUsdpValue
     ? availableMetric(globalUsdpValue, "usdp_base_units", {
         verification:
@@ -231,7 +242,9 @@ export function buildStablewatchAssetPayload({
       })
     : unavailableMetric(
         "usdp_base_units",
-        "twenty_four_chain_supply_snapshot_missing",
+        globalUsdp
+          ? "twenty_four_chain_supply_snapshot_incomplete"
+          : "twenty_four_chain_supply_snapshot_missing",
       );
   if (globalUsdp?.status === "stale" || globalUsdp?.freshness?.stale)
     globalUsdpSupply = staleMetric(globalUsdpSupply);
@@ -350,7 +363,10 @@ export function buildStablewatchAssetPayload({
   return {
     schemaVersion: "parallel-stablewatch-asset-v1",
     generatedAt,
-    status: globalHistoryVerified ? "candidate" : "partial",
+    status:
+      globalHistoryVerified && globalUsdpCoverageComplete
+        ? "candidate"
+        : "partial",
     protocol: {
       id: "parallel-v3",
       name: "Parallel",

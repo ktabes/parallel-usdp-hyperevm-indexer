@@ -112,9 +112,9 @@ export const publicSupplyRpcUrls = (adapter: UsdpSupplyAdapter) => {
   if (adapter.chain.id === 56)
     return [
       ...new Set([
-        rpcUrl,
         "https://bsc-dataseed.bnbchain.org",
         "https://bsc-dataseed-public.bnbchain.org",
+        rpcUrl,
       ]),
     ];
   return [rpcUrl];

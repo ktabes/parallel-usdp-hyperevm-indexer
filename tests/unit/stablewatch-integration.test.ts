@@ -109,6 +109,33 @@ describe("StableWatch-compatible asset payload", () => {
     });
   });
 
+  it("withholds a partial 24-chain sum instead of publishing it as global supply", () => {
+    const payload = buildStablewatchAssetPayload({
+      ...baseInput,
+      globalUsdp: {
+        ...baseInput.globalUsdp,
+        status: "partial",
+        candidateTotalSupply: "880000000000000000",
+        coverage: {
+          ...baseInput.globalUsdp.coverage,
+          includedChainCount: 1,
+          includedChainIds: [56],
+          staleChainIds: [
+            1, 8453, 146, 999, 43114, 137, 42161, 10, 1329, 80094, 534352, 100,
+            130, 57073, 239, 59144, 196, 98866, 9745, 747474, 252, 480, 43111,
+          ],
+        },
+      },
+    });
+
+    expect(payload.status).toBe("partial");
+    expect(payload.detail.usdpSupply.global).toMatchObject({
+      availability: "unavailable",
+      value: null,
+      reason: "twenty_four_chain_supply_snapshot_incomplete",
+    });
+  });
+
   it("promotes only a complete reconciled global history interval", () => {
     const payload = buildStablewatchAssetPayload({
       ...baseInput,

@@ -18,6 +18,10 @@ export const GLOBAL_USDP_MANIFEST_VERSION =
   "parallel-usdp-24-chain-registry-2026-07-15-candidate";
 export const GLOBAL_USDP_CALCULATION_VERSION =
   "parallel-global-usdp-supply-v1-candidate";
+const SUPPLY_RPC_TIMEOUT_MS = 8_000;
+const SUPPLY_RPC_RETRY_COUNT = 1;
+const SUPPLY_RPC_ATTEMPTS_PER_URL = 1;
+const SUPPLY_MAX_REQUEST_INTERVAL_MS = 500;
 
 type FinalityMode =
   "rpc-finalized" | "confirmation-lag" | "confirmation-lag-fallback";
@@ -94,9 +98,9 @@ export function isBlockTimestampOutsideAlignment(
   alignmentMaximumSkewSeconds: number,
 ) {
   const observedAtSeconds = BigInt(Math.floor(observedAt.getTime() / 1_000));
-  return (
-    observedAtSeconds - blockTimestamp > BigInt(alignmentMaximumSkewSeconds)
-  );
+  const delta = observedAtSeconds - blockTimestamp;
+  const absoluteDelta = delta < 0n ? -delta : delta;
+  return absoluteDelta > BigInt(alignmentMaximumSkewSeconds);
 }
 
 async function insertBlock(
@@ -194,7 +198,12 @@ export async function captureUsdpSupplyComponent(options: {
   requestIntervalMs?: number;
 }) {
   const client = createEvmClient(options.adapter.chain, options.rpcUrl, {
-    minRequestIntervalMs: options.requestIntervalMs,
+    minRequestIntervalMs: Math.min(
+      options.requestIntervalMs ?? SUPPLY_MAX_REQUEST_INTERVAL_MS,
+      SUPPLY_MAX_REQUEST_INTERVAL_MS,
+    ),
+    retryCount: SUPPLY_RPC_RETRY_COUNT,
+    timeoutMs: SUPPLY_RPC_TIMEOUT_MS,
   });
   const { block, finalityMode } = await finalizedBlock(
     client,
@@ -332,28 +341,21 @@ export function aggregateUsdpSupplyComponents(options: {
   maximumAgeSeconds: number;
   alignmentMaximumSkewSeconds: number;
 }) {
-  const validTimestamps = options.components
-    .filter((component) => component.metadataVerified)
-    .map((component) => component.blockTimestamp.getTime());
-  const alignmentAnchor =
-    validTimestamps.length === 0 ? null : Math.max(...validTimestamps);
   const staleChainIds = options.components
     .filter((component) => {
+      const offsetFromObservation = Math.floor(
+        Math.abs(options.asOf.getTime() - component.blockTimestamp.getTime()) /
+          1_000,
+      );
       const age = Math.max(
         0,
         Math.floor(
           (options.asOf.getTime() - component.blockTimestamp.getTime()) / 1_000,
         ),
       );
-      const skew =
-        alignmentAnchor === null
-          ? 0
-          : Math.floor(
-              (alignmentAnchor - component.blockTimestamp.getTime()) / 1_000,
-            );
       return (
         age > options.maximumAgeSeconds ||
-        skew > options.alignmentMaximumSkewSeconds
+        offsetFromObservation > options.alignmentMaximumSkewSeconds
       );
     })
     .map((component) => component.chainId);
@@ -573,38 +575,43 @@ export async function captureGlobalUsdpSupply(pool: Pool, env: RuntimeEnv) {
   const secretUrls = adapters
     .filter((adapter) => adapter.rpcSource !== "public-default")
     .flatMap((adapter) => adapter.rpcUrls);
-  const attempts = await mapWithConcurrency(adapters, 6, async (adapter) => {
-    try {
-      return {
-        ok: true as const,
-        component: await runWithSupplyRpcFailover({
-          rpcUrls: adapter.rpcUrls,
-          operation: (rpcUrl) =>
-            captureUsdpSupplyComponent({
-              pool,
-              adapter,
-              rpcUrl,
-              rpcSource: adapter.rpcSource,
-              finalityLag: env.FINALITY_LAG,
-              observedAt: asOf,
-              alignmentMaximumSkewSeconds:
-                env.USDP_SUPPLY_ALIGNMENT_MAX_SKEW_SECONDS,
-              requestIntervalMs: env.RPC_REQUEST_INTERVAL_MS,
-            }),
-        }),
-      };
-    } catch (error) {
-      return {
-        ok: false as const,
-        failure: {
-          chainId: adapter.chain.id,
-          chainSlug: adapter.deployment.chainSlug,
-          reason: "snapshot_failed" as const,
-          message: redactSecrets(providerErrorMessage(error), secretUrls),
-        },
-      };
-    }
-  });
+  const attempts = await mapWithConcurrency(
+    adapters,
+    adapters.length,
+    async (adapter) => {
+      try {
+        return {
+          ok: true as const,
+          component: await runWithSupplyRpcFailover({
+            rpcUrls: adapter.rpcUrls,
+            attemptsPerRpc: SUPPLY_RPC_ATTEMPTS_PER_URL,
+            operation: (rpcUrl) =>
+              captureUsdpSupplyComponent({
+                pool,
+                adapter,
+                rpcUrl,
+                rpcSource: adapter.rpcSource,
+                finalityLag: env.FINALITY_LAG,
+                observedAt: asOf,
+                alignmentMaximumSkewSeconds:
+                  env.USDP_SUPPLY_ALIGNMENT_MAX_SKEW_SECONDS,
+                requestIntervalMs: env.RPC_REQUEST_INTERVAL_MS,
+              }),
+          }),
+        };
+      } catch (error) {
+        return {
+          ok: false as const,
+          failure: {
+            chainId: adapter.chain.id,
+            chainSlug: adapter.deployment.chainSlug,
+            reason: "snapshot_failed" as const,
+            message: redactSecrets(providerErrorMessage(error), secretUrls),
+          },
+        };
+      }
+    },
+  );
   const components = attempts
     .filter((attempt) => attempt.ok)
     .map((attempt) => attempt.component);

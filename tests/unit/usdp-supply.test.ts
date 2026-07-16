@@ -86,13 +86,37 @@ describe("global USDp supply aggregation", () => {
 });
 
 describe("USDp supply block alignment", () => {
-  it("accepts a finalized block inside the window and rejects an old tag", () => {
+  it("accepts a finalized block inside the window and rejects old or future tags", () => {
     expect(isBlockTimestampOutsideAlignment(1_784_203_140n, asOf, 1_800)).toBe(
       false,
     );
     expect(isBlockTimestampOutsideAlignment(1_784_200_000n, asOf, 1_800)).toBe(
       true,
     );
+    expect(isBlockTimestampOutsideAlignment(1_784_205_601n, asOf, 1_800)).toBe(
+      true,
+    );
+  });
+
+  it("excludes only a component captured outside the common observation window", () => {
+    const result = aggregateUsdpSupplyComponents({
+      components: [
+        component(1),
+        component(56, {
+          blockTimestamp: new Date("2026-07-16T12:31:00.000Z"),
+        }),
+      ],
+      expectedChainIds: [1, 56],
+      failedChainIds: [],
+      asOf,
+      maximumAgeSeconds: 3_600,
+      alignmentMaximumSkewSeconds: 1_800,
+    });
+
+    expect(result.coverageStatus).toBe("partial");
+    expect(result.includedChainIds).toEqual([1]);
+    expect(result.staleChainIds).toEqual([56]);
+    expect(result.candidateTotalSupply).toBe(1_000n);
   });
 });
 
@@ -111,6 +135,9 @@ describe("USDp supply adapter registry", () => {
         "https://bsc-dataseed.bnbchain.org",
         "https://bsc-dataseed-public.bnbchain.org",
       ]),
+    );
+    expect(publicSupplyRpcUrls(bnb)[0]).toBe(
+      "https://bsc-dataseed.bnbchain.org",
     );
   });
 });

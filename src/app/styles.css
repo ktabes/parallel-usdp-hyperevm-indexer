@@ -1627,6 +1627,10 @@ h1 span {
   color: var(--blue);
   border-color: rgb(129 155 255 / 20%);
 }
+.method-state.incomplete {
+  color: #f2bd72;
+  border-color: rgb(242 189 114 / 24%);
+}
 .terminology-note {
   display: grid;
   grid-template-columns: 220px 1fr;

@@ -277,9 +277,9 @@ export default async function Home() {
   const savingsSupply = BigInt(
     data.detail.usdpSupply.onSavingsChains.value ?? "0",
   );
-  const globalSupply = BigInt(
-    data.detail.usdpSupply.global.value ?? savingsSupply.toString(),
-  );
+  const globalSupplyValue = data.detail.usdpSupply.global.value;
+  const globalSupplyAvailable = globalSupplyValue !== null;
+  const globalSupply = BigInt(globalSupplyValue ?? "0");
   const usdpOnlyDeploymentCount = Math.max(
     0,
     data.asset.stablecoin.expectedDeploymentCount -
@@ -292,10 +292,9 @@ export default async function Home() {
     "components" in globalUsdp && Array.isArray(globalUsdp.components)
       ? globalUsdp.components
       : [];
-  const usdpOnlySupply = sumIncludedSupplyOutsideChains(
-    globalUsdpComponents,
-    savingsChainIds,
-  );
+  const usdpOnlySupply = globalSupplyAvailable
+    ? sumIncludedSupplyOutsideChains(globalUsdpComponents, savingsChainIds)
+    : 0n;
   const totalShares = sum(
     data.detail.chainBreakdown.map((chain) => chain.susdpTotalSupply),
   );
@@ -307,7 +306,9 @@ export default async function Home() {
   );
   const portfolioSharePrice =
     totalShares > 0n ? (totalAssets * 10n ** 18n) / totalShares : 0n;
-  const vaultCapture = shareOf(totalAssets, globalSupply);
+  const vaultCapture = globalSupplyAvailable
+    ? shareOf(totalAssets, globalSupply)
+    : null;
   const pendingYieldShare = shareOf(pendingYield, totalAssets);
   const verifiedHistory = data.trust.verifiedHistoricalChainIds.length;
   const publishedLifetimeChains = lifetime.filter(
@@ -521,9 +522,15 @@ export default async function Home() {
               <span className="metric-glyph">Σ</span>
             </div>
             <strong>
-              {decimal(data.detail.usdpSupply.global.value, 18, 2)} USDp
+              {globalSupplyAvailable
+                ? `${decimal(globalSupplyValue, 18, 2)} USDp`
+                : "Unavailable"}
             </strong>
-            <small>Observed across all 24 USDp deployments</small>
+            <small>
+              {globalSupplyAvailable
+                ? "Observed across all 24 USDp deployments"
+                : "Latest 24-chain snapshot is incomplete"}
+            </small>
           </article>
         </section>
 
@@ -559,13 +566,25 @@ export default async function Home() {
                 </div>
                 <div>
                   <small>Global observed supply</small>
-                  <strong>{decimal(globalSupply.toString(), 18, 2)}</strong>
-                  <span>USDp · 24 deployments</span>
+                  <strong>{decimal(globalSupplyValue, 18, 2)}</strong>
+                  <span>
+                    {globalSupplyAvailable
+                      ? "USDp · 24 deployments"
+                      : "Complete aligned snapshot required"}
+                  </span>
                 </div>
                 <div>
                   <small>Vaulted into sUSDp</small>
-                  <strong>{vaultCapture.toFixed(2)}%</strong>
-                  <span>{compact(totalAssets.toString())} USDp</span>
+                  <strong>
+                    {vaultCapture === null
+                      ? "—"
+                      : `${vaultCapture.toFixed(2)}%`}
+                  </strong>
+                  <span>
+                    {vaultCapture === null
+                      ? "Awaiting complete global supply"
+                      : `${compact(totalAssets.toString())} USDp`}
+                  </span>
                 </div>
                 <div>
                   <small>Registered deployments</small>
@@ -605,10 +624,20 @@ export default async function Home() {
                   </strong>
                   <p>
                     USDp also exists beyond the five savings chains—including
-                    BNB Chain and Sei—with{" "}
-                    {decimal(usdpOnlySupply.toString(), 18, 2)} USDp combined in
-                    this aligned snapshot. They are counted in global USDp
-                    supply but omitted from sUSDp TVL, APY, YPO, and lifetime
+                    BNB Chain and Sei.{" "}
+                    {globalSupplyAvailable ? (
+                      <>
+                        Those deployments hold{" "}
+                        {decimal(usdpOnlySupply.toString(), 18, 2)} USDp in this
+                        aligned snapshot and are counted in global USDp supply.
+                      </>
+                    ) : (
+                      <>
+                        Their combined supply is withheld until all 24 chain
+                        components pass the same alignment gate.
+                      </>
+                    )}{" "}
+                    They are omitted from sUSDp TVL, APY, YPO, and lifetime
                     savings metrics because sUSDp is not deployed there.
                   </p>
                 </div>
@@ -1380,7 +1409,13 @@ export default async function Home() {
                     )
                   : "Snapshot pending"}
               </code>
-              <span className="method-state onchain">24-chain onchain</span>
+              <span
+                className={`method-state ${globalSupplyAvailable ? "onchain" : "incomplete"}`}
+              >
+                {globalSupplyAvailable
+                  ? "24-chain onchain"
+                  : "Alignment incomplete"}
+              </span>
             </div>
             <div>
               <strong>Seven-day Yield Paid Out</strong>
