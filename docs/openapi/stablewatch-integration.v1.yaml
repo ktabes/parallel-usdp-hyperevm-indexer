@@ -1,0 +1,140 @@
+openapi: 3.1.0
+info:
+  title: Parallel USDp + sUSDp StableWatch Integration
+  version: 1.0.0
+  description: >-
+    Read-only, versioned integration payload for a StableWatch market row and
+    asset detail. Integer quantities are serialized as strings so no precision
+    is lost in JSON.
+servers:
+  - url: https://content-spirit-production-5efa.up.railway.app
+paths:
+  /api/v1/stablewatch/assets/parallel-usdp-susdp:
+    get:
+      operationId: getParallelUsdpSusdpAsset
+      summary: Get the cross-chain Parallel USDp and sUSDp analytics payload
+      responses:
+        "200":
+          description: Current metrics, history, coverage, and provenance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StablewatchAsset"
+        "503":
+          description: No readable analytics snapshot is available
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, error]
+                properties:
+                  status:
+                    const: unavailable
+                  error:
+                    type: string
+components:
+  schemas:
+    MetricValue:
+      type: object
+      required: [availability, verification, value, unit]
+      properties:
+        availability:
+          enum: [available, stale, unavailable]
+        verification:
+          enum: [verified, candidate, not_applicable]
+        value:
+          type: [string, "null"]
+          description: Exact integer encoded as a decimal string, or null.
+        unit:
+          type: string
+          examples: [usdp_base_units, fixed_18, usd_atomic_18]
+        asOf:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        calculationVersion:
+          type: string
+        attribution:
+          type: string
+      additionalProperties: false
+    StablewatchAsset:
+      type: object
+      required:
+        - schemaVersion
+        - generatedAt
+        - status
+        - protocol
+        - asset
+        - marketRow
+        - detail
+        - trust
+        - nonApplicableMetrics
+        - sources
+      properties:
+        schemaVersion:
+          const: parallel-stablewatch-asset-v1
+        generatedAt:
+          type: string
+          format: date-time
+        status:
+          enum: [candidate, partial]
+        protocol:
+          type: object
+          additionalProperties: true
+        asset:
+          type: object
+          additionalProperties: true
+        marketRow:
+          type: object
+          required:
+            - asset
+            - protocol
+            - tvlUsdp
+            - tvlUsdEstimate
+            - estimatedApy
+            - ypoSevenDay
+          properties:
+            asset:
+              const: sUSDp
+            protocol:
+              const: Parallel
+            tvlUsdp:
+              $ref: "#/components/schemas/MetricValue"
+            tvlUsdEstimate:
+              $ref: "#/components/schemas/MetricValue"
+            tvlSevenDayChange:
+              $ref: "#/components/schemas/MetricValue"
+            estimatedApy:
+              $ref: "#/components/schemas/MetricValue"
+            realizedApySevenDay:
+              $ref: "#/components/schemas/MetricValue"
+            realizedApyThirtyDay:
+              $ref: "#/components/schemas/MetricValue"
+            ypoSevenDay:
+              $ref: "#/components/schemas/MetricValue"
+            ypoThirtyDay:
+              $ref: "#/components/schemas/MetricValue"
+            ypoNinetyDay:
+              $ref: "#/components/schemas/MetricValue"
+            ypoAllTime:
+              $ref: "#/components/schemas/MetricValue"
+          additionalProperties: false
+        detail:
+          type: object
+          description: Headline metrics, per-chain evidence, and chart readiness.
+          additionalProperties: true
+        trust:
+          type: object
+          description: Freshness, coverage, reconciliation, and registry provenance.
+          additionalProperties: true
+        nonApplicableMetrics:
+          type: array
+          items:
+            type: string
+        sources:
+          type: array
+          items:
+            type: string
+            format: uri
+      additionalProperties: false

@@ -3,8 +3,9 @@ import type { ReactNode } from "react";
 import "./styles.css";
 
 export const metadata: Metadata = {
-  title: "Parallel USDp on HyperEVM",
-  description: "Auditable USDp and sUSDp indexing and yield analytics.",
+  title: "Parallel Watch · USDp + sUSDp Analytics",
+  description:
+    "Auditable cross-chain USDp and sUSDp state, yield, and coverage analytics.",
 };
 
 export default function RootLayout({
