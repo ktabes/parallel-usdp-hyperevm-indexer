@@ -2,7 +2,7 @@
 
 Date: 2026-07-15  
 Production service: `https://content-spirit-production-5efa.up.railway.app`  
-Code commits: `71e6e43`, `3618849`, `cfcc5cb`
+Code commits: `71e6e43`, `3618849`, `cfcc5cb`, `91c4247`, `bfc75d7`
 
 ## Outcome
 
@@ -42,9 +42,24 @@ The database rows were therefore promoted from `candidate` to `verified`. Window
 | Base      | Pass          | Pass after one transient official-RPC backend failure | Complete       | Verified interval stored.                                                                           |
 | Sonic     | Pass          | Pass                                                  | Complete       | Verified zero-yield interval stored.                                                                |
 | Avalanche | Pass          | Pass                                                  | Complete       | Verified positive-yield interval stored.                                                            |
-| HyperEVM  | Pass          | Deferred                                              | Deferred       | Historical provider budget remains deferred from the earlier phase.                                 |
+| HyperEVM  | Pass          | Pass via QuickNode Archive EVM                        | In progress    | Pinned seven-day scope is actively resuming from reused, gap-free coverage at block 40,176,979.     |
 
 Ethereum Mainnet was enabled successfully in the existing Alchemy app. Alchemy's free plan proved the exact historical state boundaries but restricted `eth_getLogs` to ten-block ranges. The backfill therefore used Alchemy for range planning and pinned state reads, plus `https://eth.drpc.org` for six read-only sUSDp log ranges of at most 10,000 blocks. This provider split completed 50,204 blocks without gaps, retries, reductions, or paid archive capacity.
+
+## HyperEVM pinned resume and coverage reuse
+
+On 2026-07-16 UTC, QuickNode Archive EVM passed both historical boundary reads for the pinned window from block `39,958,147` through `40,572,940`. The provider's Discover-plan `eth_getLogs` limit is five blocks per request, so `--window-end 1784163557` fixes the exact scope across process restarts and prevents a moving seven-day window from discarding checkpoint progress.
+
+The earlier `parallel-usdp-susdp-seven-day-v1` run had already proven a continuous USDp-and-sUSDp superset from the new window's start through block `40,176,978`. Before reuse, the production transaction:
+
+- locked both source and target checkpoints;
+- independently rejected any source or target coverage gap;
+- copied 43,767 source coverage rows with their original `run_id` and `scanned_at` provenance;
+- preserved the source reorg anchor at block `40,173,813`;
+- proved the target scope complete across all 218,832 reused blocks; and
+- advanced the target checkpoint to `40,176,979` without deleting immutable logs, events, or newer target-scope coverage.
+
+QuickNode then resumed at block `40,176,979` with zero retries, decoder failures, or range reductions in the first 200 five-block chunks. The live run remains candidate until it reaches block `40,572,940`, proves gap-free coverage, and passes independent YPO reconciliation.
 
 ## Code and schema delivered
 
@@ -54,6 +69,7 @@ Ethereum Mainnet was enabled successfully in the existing Alchemy app. Alchemy's
 - `global_savings_yield_aggregates` and component links fail closed: candidate or invalid chain intervals are visible but not silently summed.
 - `history-plan`, `history-boundaries`, `history-backfill`, `history-reconcile`, and `history` CLI commands provide a gated operator workflow.
 - `history-backfill --log-rpc-url` permits a separate historical log provider only after the configured chain RPC proves both pinned state boundaries.
+- `history-backfill --window-end` pins the common Unix endpoint so provider changes and process restarts resume the same durable scope.
 - `/api/analytics/history` exposes the latest chain intervals and preserves `global: null` until a valid aligned global interval exists.
 
 ## Verification completed
@@ -69,6 +85,6 @@ Ethereum Mainnet was enabled successfully in the existing Alchemy app. Alchemy's
 
 ## Remaining Phase 6 work
 
-1. Resume HyperEVM history when an archive/log provider budget is available.
+1. Complete the active HyperEVM scan from block `40,176,979` through `40,572,940` and run exact reconciliation.
 2. Run one common aligned five-chain window after all providers pass.
 3. Add segmented rate/accrual reconciliation for intervals whose state basis changes inside the window.
