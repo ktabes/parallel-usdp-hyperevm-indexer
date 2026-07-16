@@ -19,7 +19,7 @@ Chain-local token and vault reads remain the evidence units. A global sUSDp snap
 
 ## Historical windows
 
-A cross-chain history job first chooses one UTC end time no later than the oldest configured chain's finalized timestamp, then resolves the first block at or after the common start and end timestamps independently on each chain. Both pinned boundary states must succeed before log ingestion begins. Each chain receives its own checkpoint and complete-coverage proof. Candidate YPO uses `Accrued` events in `(start_block,end_block]` plus the change in pending yield between the two exact boundary snapshots. A global YPO total includes only independently reconciled `verified` intervals within the alignment tolerance; candidate components remain visible but unsummed.
+A cross-chain history job first chooses one UTC end time no later than the oldest configured chain's finalized timestamp, then resolves the first block at or after the common start and end timestamps independently on each chain. Both pinned boundary states must succeed before log ingestion begins. Each chain receives its own checkpoint and complete-coverage proof. Savings-history log queries target sUSDp only; unrelated high-volume USDp transfers are deferred to the standalone USDp distribution and bridge-accounting lane. Candidate YPO uses `Accrued` events in `(start_block,end_block]` plus the change in pending yield between the two exact boundary snapshots. A global YPO total includes only independently reconciled `verified` intervals within the alignment tolerance; candidate components remain visible but unsummed.
 
 ## Availability
 

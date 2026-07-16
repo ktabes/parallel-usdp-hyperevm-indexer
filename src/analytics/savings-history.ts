@@ -138,6 +138,7 @@ export interface RunSavingsHistoryOptions {
   env: RuntimeEnv;
   range: AlignedSavingsHistoryRange;
   chunkSize?: number;
+  logRpcUrl?: string;
   onProgress?: Parameters<typeof ingestLogs>[0]["onProgress"];
 }
 
@@ -176,8 +177,9 @@ export async function runSavingsHistoryRange(
 
   const ingestion = await ingestLogs({
     pool: options.pool,
-    rpcUrl: options.range.rpcUrl,
+    rpcUrl: options.logRpcUrl ?? options.range.rpcUrl,
     adapter,
+    addresses: [adapter.susdp.address],
     fromBlock: options.range.fromBlock,
     toBlock: options.range.toBlock,
     finalityLag: options.env.FINALITY_LAG,

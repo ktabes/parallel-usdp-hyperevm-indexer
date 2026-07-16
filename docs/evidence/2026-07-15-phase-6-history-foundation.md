@@ -2,21 +2,22 @@
 
 Date: 2026-07-15  
 Production service: `https://content-spirit-production-5efa.up.railway.app`  
-Code commits: `71e6e43`, `3618849`
+Code commits: `71e6e43`, `3618849`, `cfcc5cb`
 
 ## Outcome
 
 The production indexer now has one chain-aware historical pipeline for all five official sUSDp chains. It resolves independent block numbers onto UTC windows, proves exact pinned start/end state before log spending, stores immutable logs and coverage, derives chain-local flows, calculates native YPO, and requires an independent rate integration before marking YPO verified.
 
-Three of the four newly added historical adapters completed real seven-day production backfills and exact reconciliation:
+All four newly added historical adapters completed real seven-day production backfills and exact reconciliation:
 
 | Chain     | Blocks covered | Raw logs | Decoded events | Coverage gaps |         Verified native YPO |
 | --------- | -------------: | -------: | -------------: | ------------: | --------------------------: |
+| Ethereum  |         50,204 |        0 |              0 |             0 |   5.241083879972596955 USDp |
 | Base      |        302,401 |      193 |            158 |             0 |   0.484768050314572263 USDp |
 | Sonic     |        382,822 |      144 |            144 |             0 |                      0 USDp |
 | Avalanche |        578,286 |       50 |             39 |             0 | 484.979734550454000326 USDp |
 
-All three completed with zero decoder failures, RPC retries, and range reductions. The decoded events were USDp `Transfer` evidence: 158 on Base, 144 on Sonic, and 39 on Avalanche. No sUSDp Deposit or Withdraw occurred in these windows, so native user-flow aggregates correctly remained empty rather than inventing zero-valued events.
+All four completed with zero decoder failures, RPC retries, and range reductions. The earlier Base, Sonic, and Avalanche runs also collected USDp `Transfer` evidence: 158 on Base, 144 on Sonic, and 39 on Avalanche. The optimized Ethereum run queried only the sUSDp vault and found no events. Savings history now requests only sUSDp Deposit, Withdraw, Accrued, rate, pause, and share-transfer evidence; high-volume USDp transfers are reserved for the standalone USDp distribution and bridge-accounting lane. No sUSDp Deposit or Withdraw occurred in these windows, so native user-flow aggregates correctly remained empty rather than inventing zero-valued events.
 
 Live endpoint: `https://content-spirit-production-5efa.up.railway.app/api/analytics/history`
 
@@ -24,7 +25,7 @@ Live endpoint: `https://content-spirit-production-5efa.up.railway.app/api/analyt
 
 Each completed interval had no in-window `Accrued` event and retained the same actual USDp asset balance, savings rate, and `lastUpdate` across its boundaries. The reconciliation service independently recomputed `totalAssets()` at both boundary timestamps using the on-chain fixed-point rate formula.
 
-For Base, Sonic, and Avalanche:
+For Ethereum, Base, Sonic, and Avalanche:
 
 - predicted start `totalAssets` equaled the pinned start read exactly;
 - predicted end `totalAssets` equaled the pinned end read exactly;
@@ -35,15 +36,15 @@ The database rows were therefore promoted from `candidate` to `verified`. Window
 
 ## Provider capability matrix
 
-| Chain     | Current state | Seven-day pinned state                                | Seven-day logs | Result                                                                                                |
-| --------- | ------------- | ----------------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------- |
-| Ethereum  | Pass          | Blocked on configured providers                       | Not started    | PublicNode requires a personal archive token. The existing Alchemy app has Ethereum Mainnet disabled. |
-| Base      | Pass          | Pass after one transient official-RPC backend failure | Complete       | Verified interval stored.                                                                             |
-| Sonic     | Pass          | Pass                                                  | Complete       | Verified zero-yield interval stored.                                                                  |
-| Avalanche | Pass          | Pass                                                  | Complete       | Verified positive-yield interval stored.                                                              |
-| HyperEVM  | Pass          | Deferred                                              | Deferred       | Historical provider budget remains deferred from the earlier phase.                                   |
+| Chain     | Current state | Seven-day pinned state                                | Seven-day logs | Result                                                                                              |
+| --------- | ------------- | ----------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------- |
+| Ethereum  | Pass          | Pass via Alchemy                                      | Complete       | Alchemy proved exact boundary state; free dRPC supplied six sUSDp-only log ranges. Verified stored. |
+| Base      | Pass          | Pass after one transient official-RPC backend failure | Complete       | Verified interval stored.                                                                           |
+| Sonic     | Pass          | Pass                                                  | Complete       | Verified zero-yield interval stored.                                                                |
+| Avalanche | Pass          | Pass                                                  | Complete       | Verified positive-yield interval stored.                                                            |
+| HyperEVM  | Pass          | Deferred                                              | Deferred       | Historical provider budget remains deferred from the earlier phase.                                 |
 
-The Ethereum gate failed before log ingestion or YPO writes. Enabling Ethereum Mainnet for the existing Alchemy app should allow the same boundary command to be retried without adding a new key.
+Ethereum Mainnet was enabled successfully in the existing Alchemy app. Alchemy's free plan proved the exact historical state boundaries but restricted `eth_getLogs` to ten-block ranges. The backfill therefore used Alchemy for range planning and pinned state reads, plus `https://eth.drpc.org` for six read-only sUSDp log ranges of at most 10,000 blocks. This provider split completed 50,204 blocks without gaps, retries, reductions, or paid archive capacity.
 
 ## Code and schema delivered
 
@@ -52,6 +53,7 @@ The Ethereum gate failed before log ingestion or YPO writes. Enabling Ethereum M
 - `savings_yield_aggregates` links exact normalized boundary snapshots, complete log coverage, native YPO, and reconciliation status.
 - `global_savings_yield_aggregates` and component links fail closed: candidate or invalid chain intervals are visible but not silently summed.
 - `history-plan`, `history-boundaries`, `history-backfill`, `history-reconcile`, and `history` CLI commands provide a gated operator workflow.
+- `history-backfill --log-rpc-url` permits a separate historical log provider only after the configured chain RPC proves both pinned state boundaries.
 - `/api/analytics/history` exposes the latest chain intervals and preserves `global: null` until a valid aligned global interval exists.
 
 ## Verification completed
@@ -63,11 +65,10 @@ The Ethereum gate failed before log ingestion or YPO writes. Enabling Ethereum M
 - Production build: passed.
 - Migration `0005_lively_roxanne_simpson.sql`: applied in Railway.
 - Current-state worker after migration: complete, 5/5 candidate snapshots.
-- Historical API: partial with three verified chain intervals and no fabricated global total.
+- Historical API: partial with four verified chain intervals and no fabricated global total.
 
 ## Remaining Phase 6 work
 
-1. Enable Ethereum Mainnet on the existing Alchemy app and run its boundary gate and seven-day backfill.
-2. Resume HyperEVM history when an archive/log provider budget is available.
-3. Run one common aligned five-chain window after all providers pass.
-4. Add segmented rate/accrual reconciliation for intervals whose state basis changes inside the window.
+1. Resume HyperEVM history when an archive/log provider budget is available.
+2. Run one common aligned five-chain window after all providers pass.
+3. Add segmented rate/accrual reconciliation for intervals whose state basis changes inside the window.

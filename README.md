@@ -51,6 +51,7 @@ npm run cli -- snapshot-all
 npm run cli -- history-plan --days 7
 npm run cli -- history-boundaries --days 7
 npm run cli -- history-backfill --chain base --days 7
+npm run cli -- history-backfill --chain ethereum --days 7 --log-rpc-url LOG_RPC_URL
 npm run cli -- history-reconcile --chains base,sonic,avalanche
 npm run cli -- history
 npm run cli -- calculate-yield --from-block START --to-block END
@@ -77,7 +78,7 @@ On Railway, set `RUN_SEVEN_DAY_BACKFILL=1` to start the worker beside the web se
 
 For cross-chain current state, configure `ETHEREUM_RPC_URL`, `BASE_RPC_URL`, `SONIC_RPC_URL`, and `AVALANCHE_RPC_URL` alongside the existing `HYPEREVM_RPC_URL`, then set `RUN_MULTICHAIN_SNAPSHOTS=1`. Ethereum, Base, Sonic, and Avalanche use their RPC `finalized` block tag; HyperEVM retains its configured confirmation lag. The worker uses one Multicall state read per non-HyperEVM chain, records missing or failed RPCs as partial coverage, and never takes down the web service because one chain is unavailable. `GLOBAL_SNAPSHOT_MAX_AGE_SECONDS` defaults to `3600` so provider-specific Ethereum/Base L1 finality delay is not mistaken for a stopped adapter; exact component block ages remain visible.
 
-Cross-chain historical backfills are never started by web-service deployment. Plan the aligned range first, capture both historical boundaries, and then run one bounded chain backfill. The default chain set for planning is Ethereum, Base, Sonic, and Avalanche; add `--chain hyperevm` explicitly when its historical provider budget is available. Candidate chain YPO is stored with exact component provenance but is excluded from a global YPO total until independent rate reconciliation promotes it to verified.
+Cross-chain historical backfills are never started by web-service deployment. Plan the aligned range first, capture both historical boundaries, and then run one bounded chain backfill. Savings history requests only the sUSDp vault logs needed for Deposit, Withdraw, Accrued, rate, pause, and share-transfer evidence; high-volume USDp token transfers belong to the later standalone USDp distribution/bridge lane. `--log-rpc-url` can assign a separate historical log provider after the configured chain RPC proves the pinned state boundaries. The default chain set for planning is Ethereum, Base, Sonic, and Avalanche; add `--chain hyperevm` explicitly when its historical provider budget is available. Candidate chain YPO is stored with exact component provenance but is excluded from a global YPO total until independent rate reconciliation promotes it to verified.
 
 ## Phase gates
 

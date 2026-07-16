@@ -465,6 +465,7 @@ async function backfillSavingsHistory() {
             env,
             range,
             chunkSize,
+            logRpcUrl: argument("--log-rpc-url"),
             onProgress: progressReporter(),
           }),
           null,
