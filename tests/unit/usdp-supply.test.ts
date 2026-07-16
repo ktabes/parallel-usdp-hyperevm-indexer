@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   aggregateUsdpSupplyComponents,
+  isBlockTimestampOutsideAlignment,
   type UsdpSupplyComponent,
 } from "@/analytics/usdp-supply";
 import { usdpSupplyAdapters } from "@/protocol/usdp-chains";
@@ -77,6 +78,17 @@ describe("global USDp supply aggregation", () => {
     expect(result.staleChainIds).toEqual([8453]);
     expect(result.failedChainIds).toEqual([146, 999]);
     expect(result.candidateTotalSupply).toBe(1_000n);
+  });
+});
+
+describe("USDp supply block alignment", () => {
+  it("accepts a finalized block inside the window and rejects an old tag", () => {
+    expect(isBlockTimestampOutsideAlignment(1_784_203_140n, asOf, 1_800)).toBe(
+      false,
+    );
+    expect(isBlockTimestampOutsideAlignment(1_784_200_000n, asOf, 1_800)).toBe(
+      true,
+    );
   });
 });
 

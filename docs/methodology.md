@@ -20,6 +20,8 @@ Chain-local token and vault reads remain the evidence units. A global sUSDp snap
 The standalone USDp supply cycle reads bytecode, `name`, `symbol`, `decimals`,
 and `totalSupply` at one finalized block per registered deployment. Component
 block timestamps must fall inside the configured UTC alignment skew. The
+adapter uses an explicitly labeled confirmation-lag fallback when a provider's
+`finalized` tag is unavailable or older than that alignment window. The
 candidate global value is the sum of included `totalSupply` values; bridge
 sends and receives are not added because the OFT path burns on the source and
 mints on the destination. Even complete 24-chain RPC coverage remains marked

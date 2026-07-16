@@ -53,6 +53,8 @@ async function finalizedBlock(
   client: EvmClient,
   adapter: UsdpSupplyAdapter,
   finalityLag: number,
+  observedAt: Date,
+  alignmentMaximumSkewSeconds: number,
 ) {
   if (adapter.finality === "confirmation-lag") {
     const head = await client.getBlockNumber();
@@ -64,19 +66,37 @@ async function finalizedBlock(
     };
   }
   try {
-    return {
-      block: await client.getBlock({ blockTag: "finalized" }),
-      finalityMode: "rpc-finalized" as const,
-    };
+    const block = await client.getBlock({ blockTag: "finalized" });
+    if (
+      !isBlockTimestampOutsideAlignment(
+        block.timestamp,
+        observedAt,
+        alignmentMaximumSkewSeconds,
+      )
+    )
+      return { block, finalityMode: "rpc-finalized" as const };
   } catch {
-    const head = await client.getBlockNumber();
-    return {
-      block: await client.getBlock({
-        blockNumber: head - BigInt(finalityLag),
-      }),
-      finalityMode: "confirmation-lag-fallback" as const,
-    };
+    // Continue into the same explicit confirmation-lag fallback used when a
+    // provider exposes a finalized tag that is too old for this UTC window.
   }
+  const head = await client.getBlockNumber();
+  return {
+    block: await client.getBlock({
+      blockNumber: head - BigInt(finalityLag),
+    }),
+    finalityMode: "confirmation-lag-fallback" as const,
+  };
+}
+
+export function isBlockTimestampOutsideAlignment(
+  blockTimestamp: bigint,
+  observedAt: Date,
+  alignmentMaximumSkewSeconds: number,
+) {
+  const observedAtSeconds = BigInt(Math.floor(observedAt.getTime() / 1_000));
+  return (
+    observedAtSeconds - blockTimestamp > BigInt(alignmentMaximumSkewSeconds)
+  );
 }
 
 async function insertBlock(
@@ -169,6 +189,8 @@ export async function captureUsdpSupplyComponent(options: {
   rpcUrl: string;
   rpcSource: SupplyRpcSource;
   finalityLag: number;
+  observedAt?: Date;
+  alignmentMaximumSkewSeconds?: number;
   requestIntervalMs?: number;
 }) {
   const client = createEvmClient(options.adapter.chain, options.rpcUrl, {
@@ -178,6 +200,8 @@ export async function captureUsdpSupplyComponent(options: {
     client,
     options.adapter,
     options.finalityLag,
+    options.observedAt ?? new Date(),
+    options.alignmentMaximumSkewSeconds ?? 1_800,
   );
   if (block.number === null || !block.hash)
     throw new Error(`${options.adapter.deployment.chainName} block incomplete`);
@@ -527,6 +551,9 @@ export async function captureGlobalUsdpSupply(pool: Pool, env: RuntimeEnv) {
           rpcUrl: adapter.rpcUrl,
           rpcSource: adapter.rpcSource,
           finalityLag: env.FINALITY_LAG,
+          observedAt: asOf,
+          alignmentMaximumSkewSeconds:
+            env.USDP_SUPPLY_ALIGNMENT_MAX_SKEW_SECONDS,
           requestIntervalMs: env.RPC_REQUEST_INTERVAL_MS,
         }),
       };
