@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { reconcileConstantRateWindow } from "@/analytics/yield-reconciliation";
+import {
+  integrateSegmentedRateWindow,
+  reconcileConstantRateWindow,
+} from "@/analytics/yield-reconciliation";
 import { computeUpdatedAssets } from "@/protocol/savings-math";
 
 describe("savings YPO rate reconciliation", () => {
@@ -58,5 +61,64 @@ describe("savings YPO rate reconciliation", () => {
       status: "candidate",
       reason: "segmented_rate_reconciliation_required",
     });
+  });
+
+  it("integrates rate segments across accrual, deposit, withdrawal, and rate changes", () => {
+    const rate = 3_022_307_772_824_702_283n;
+    const startActual = 1_000_000n;
+    const startTimestamp = 1_100n;
+    const lastUpdate = 1_000n;
+    const startTotal = computeUpdatedAssets(
+      startActual,
+      rate,
+      startTimestamp - lastUpdate,
+    );
+    const accruedAt1200 =
+      computeUpdatedAssets(startActual, rate, 200n) - startActual;
+    const changedRate = rate * 2n;
+    const afterAccrual = startActual + accruedAt1200 + 50_000n - 10_000n;
+    const pendingAtEnd =
+      computeUpdatedAssets(afterAccrual, changedRate, 100n) - afterAccrual;
+    const expectedYpo =
+      accruedAt1200 - (startTotal - startActual) + pendingAtEnd;
+
+    const result = integrateSegmentedRateWindow({
+      actualAssetsAtStart: startActual,
+      totalAssetsAtStart: startTotal,
+      rateAtStart: rate,
+      lastUpdateAtStart: lastUpdate,
+      blockTimestampAtStart: startTimestamp,
+      blockTimestampAtEnd: 1_300n,
+      events: [
+        {
+          timestamp: 1_200n,
+          logIndex: 1,
+          eventName: "Accrued",
+          interest: accruedAt1200,
+        },
+        {
+          timestamp: 1_200n,
+          logIndex: 2,
+          eventName: "Deposit",
+          assets: 50_000n,
+        },
+        {
+          timestamp: 1_200n,
+          logIndex: 3,
+          eventName: "Withdraw",
+          assets: 10_000n,
+        },
+        {
+          timestamp: 1_200n,
+          logIndex: 4,
+          eventName: "RateUpdated",
+          newRate: changedRate,
+        },
+      ],
+    });
+
+    expect(result.integratedYpo).toBe(expectedYpo);
+    expect(result.accruedVariance).toBe(0n);
+    expect(result.predictedPendingYieldAtEnd).toBe(pendingAtEnd);
   });
 });

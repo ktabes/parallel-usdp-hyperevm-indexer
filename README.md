@@ -44,6 +44,7 @@ npm run cli -- seven-day-backfill
 npm run cli -- sync
 npm run cli -- status
 npm run cli -- verify-coverage --from-block FROM --to-block TO
+npm run cli -- verify --chain hyperevm --scope SCOPE --from-block FROM --to-block TO
 npm run cli -- derive-flows --from-block FROM --to-block TO
 npm run cli -- snapshot
 npm run cli -- snapshot --block FINALIZED_BLOCK
@@ -93,12 +94,21 @@ interval. Provider URLs are never included in worker progress logs. A
 PostgreSQL advisory lock prevents the web process, CLI, and dedicated worker
 from scanning the same chain/scope together.
 
-For Railway, create a worker service from the same repository with start
-command `npm run worker:hyperevm-history`. Give it `DATABASE_URL`,
+For Railway, create a service named `hyperevm-history-worker` from the same
+repository. The service-aware `npm start` entrypoint routes that exact service
+name to `npm run worker:hyperevm-history` and keeps every other service on the
+Next.js web process. Give the worker `DATABASE_URL`,
 `HYPEREVM_RPC_URL`, and the `HYPEREVM_HISTORY_*` variables, but do not enable
 `RUN_SEVEN_DAY_BACKFILL` on the web service. A successful bounded worker exits
 after flow derivation and YPO reconciliation; a restart safely no-ops from the
 completed checkpoint.
+
+`verify` runs the persisted reconciliation and health suite for an exact
+chain/scope/range. It records named expected/actual/variance/tolerance results
+and structured findings in `reconciliation_runs`, `reconciliation_results`,
+and `health_findings`. A critical reconciliation, coverage, decode, duplicate,
+RPC, implementation, or negative-YPO failure exits non-zero; incomplete holder
+history and unavailable optional evidence remain explicit warnings.
 
 On Railway, set `RUN_SEVEN_DAY_BACKFILL=1` to start the worker beside the web service. A PostgreSQL advisory lock prevents duplicate workers, recoverable RPC failures restart from the durable checkpoint, and `/api/indexer/status` exposes the checkpoint, stored row counts, and recent runs. `RPC_REQUEST_INTERVAL_MS` can tune the pace, but the conservative `1500` default is recommended for the public endpoint. Set the flag back to `0` after the initial week completes if continuous catch-up is not wanted.
 

@@ -17,6 +17,108 @@ interface ReconciliationInput {
   nativeYpo: bigint;
 }
 
+export type SavingsRateSegmentEvent =
+  | {
+      timestamp: bigint;
+      logIndex: number;
+      eventName: "Accrued";
+      interest: bigint;
+    }
+  | {
+      timestamp: bigint;
+      logIndex: number;
+      eventName: "Deposit";
+      assets: bigint;
+    }
+  | {
+      timestamp: bigint;
+      logIndex: number;
+      eventName: "Withdraw";
+      assets: bigint;
+    }
+  | {
+      timestamp: bigint;
+      logIndex: number;
+      eventName: "RateUpdated";
+      newRate: bigint;
+    };
+
+export function integrateSegmentedRateWindow(input: {
+  actualAssetsAtStart: bigint;
+  totalAssetsAtStart: bigint;
+  rateAtStart: bigint;
+  lastUpdateAtStart: bigint;
+  blockTimestampAtStart: bigint;
+  blockTimestampAtEnd: bigint;
+  events: readonly SavingsRateSegmentEvent[];
+}) {
+  if (
+    input.blockTimestampAtEnd < input.blockTimestampAtStart ||
+    input.lastUpdateAtStart > input.blockTimestampAtStart
+  )
+    throw new Error("Invalid segmented-rate boundary ordering");
+  let actualAssets = input.actualAssetsAtStart;
+  let rate = input.rateAtStart;
+  let lastUpdate = input.lastUpdateAtStart;
+  let integratedYpo = -(input.totalAssetsAtStart - actualAssets);
+  let predictedAccruedInterest = 0n;
+  let emittedAccruedInterest = 0n;
+  const events = [...input.events].sort(
+    (left, right) =>
+      Number(left.timestamp - right.timestamp) ||
+      left.logIndex - right.logIndex,
+  );
+
+  for (const event of events) {
+    if (
+      event.timestamp < input.blockTimestampAtStart ||
+      event.timestamp > input.blockTimestampAtEnd ||
+      event.timestamp < lastUpdate
+    )
+      throw new Error("Segmented-rate event is outside ordered boundaries");
+    if (event.eventName === "Accrued") {
+      const predictedAssets = computeUpdatedAssets(
+        actualAssets,
+        rate,
+        event.timestamp - lastUpdate,
+      );
+      const predictedInterest = predictedAssets - actualAssets;
+      predictedAccruedInterest += predictedInterest;
+      emittedAccruedInterest += event.interest;
+      integratedYpo += predictedInterest;
+      actualAssets += event.interest;
+      lastUpdate = event.timestamp;
+    } else if (event.eventName === "Deposit") {
+      actualAssets += event.assets;
+    } else if (event.eventName === "Withdraw") {
+      if (event.assets > actualAssets)
+        throw new Error("Segmented-rate withdrawal exceeds actual assets");
+      actualAssets -= event.assets;
+    } else {
+      rate = event.newRate;
+    }
+  }
+
+  const predictedTotalAssetsAtEnd = computeUpdatedAssets(
+    actualAssets,
+    rate,
+    input.blockTimestampAtEnd - lastUpdate,
+  );
+  const predictedPendingYieldAtEnd = predictedTotalAssetsAtEnd - actualAssets;
+  integratedYpo += predictedPendingYieldAtEnd;
+  return {
+    integratedYpo,
+    predictedAccruedInterest,
+    emittedAccruedInterest,
+    accruedVariance: emittedAccruedInterest - predictedAccruedInterest,
+    predictedPendingYieldAtEnd,
+    predictedTotalAssetsAtEnd,
+    actualAssetsAtEnd: actualAssets,
+    rateAtEnd: rate,
+    lastUpdateAtEnd: lastUpdate,
+  };
+}
+
 export function reconcileConstantRateWindow(input: ReconciliationInput) {
   const stableBasis =
     input.actualAssetsAtStart === input.actualAssetsAtEnd &&

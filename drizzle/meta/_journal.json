@@ -50,6 +50,13 @@
       "when": 1784172398692,
       "tag": "0006_cooing_maestro",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784205537901,
+      "tag": "0007_third_bucky",
+      "breakpoints": true
     }
   ]
 }

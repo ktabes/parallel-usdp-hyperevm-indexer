@@ -883,6 +883,113 @@ export const globalSavingsYieldAggregates = pgTable(
   ],
 );
 
+export const reconciliationRuns = pgTable(
+  "reconciliation_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    chainId: integer("chain_id").notNull(),
+    scope: text("scope").notNull(),
+    fromBlock: bigint("from_block", { mode: "bigint" }).notNull(),
+    toBlock: bigint("to_block", { mode: "bigint" }).notNull(),
+    manifestVersion: text("manifest_version").notNull(),
+    calculationVersion: text("calculation_version").notNull(),
+    status: text("status").notNull().default("running"),
+    summary: jsonb("summary").notNull().default({}),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("reconciliation_runs_scope_started_idx").on(
+      table.chainId,
+      table.scope,
+      table.startedAt,
+    ),
+    check(
+      "reconciliation_runs_range_check",
+      sql`${table.toBlock} >= ${table.fromBlock}`,
+    ),
+    check(
+      "reconciliation_runs_status_check",
+      sql`${table.status} in ('running', 'pass', 'warn', 'fail')`,
+    ),
+  ],
+);
+
+export const reconciliationResults = pgTable(
+  "reconciliation_results",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => reconciliationRuns.id, { onDelete: "cascade" }),
+    checkName: text("check_name").notNull(),
+    status: text("status").notNull(),
+    expectedValue: text("expected_value"),
+    actualValue: text("actual_value"),
+    variance: text("variance"),
+    tolerance: text("tolerance"),
+    blockNumber: bigint("block_number", { mode: "bigint" }),
+    observedAt: timestamp("observed_at", { withTimezone: true }),
+    diagnostics: jsonb("diagnostics").notNull().default({}),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("reconciliation_results_run_check_unique").on(
+      table.runId,
+      table.checkName,
+    ),
+    index("reconciliation_results_status_idx").on(
+      table.status,
+      table.checkName,
+    ),
+    check(
+      "reconciliation_results_status_check",
+      sql`${table.status} in ('pass', 'warn', 'fail')`,
+    ),
+  ],
+);
+
+export const healthFindings = pgTable(
+  "health_findings",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => reconciliationRuns.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    scope: text("scope").notNull(),
+    checkName: text("check_name").notNull(),
+    severity: text("severity").notNull(),
+    status: text("status").notNull(),
+    message: text("message").notNull(),
+    blockNumber: bigint("block_number", { mode: "bigint" }),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+    diagnostics: jsonb("diagnostics").notNull().default({}),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("health_findings_run_check_unique").on(
+      table.runId,
+      table.checkName,
+    ),
+    index("health_findings_scope_status_idx").on(
+      table.chainId,
+      table.scope,
+      table.status,
+    ),
+    check(
+      "health_findings_severity_check",
+      sql`${table.severity} in ('info', 'warning', 'critical')`,
+    ),
+    check(
+      "health_findings_status_check",
+      sql`${table.status} in ('pass', 'warn', 'fail')`,
+    ),
+  ],
+);
+
 export const globalSavingsYieldComponents = pgTable(
   "global_savings_yield_components",
   {

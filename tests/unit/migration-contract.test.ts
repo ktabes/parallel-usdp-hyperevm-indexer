@@ -119,4 +119,16 @@ describe("initial migration contract", () => {
       'CONSTRAINT "asset_deployments_block_source_check"',
     );
   });
+
+  it("persists named reconciliation evidence and structured health findings", async () => {
+    const migration = await readFile("drizzle/0007_third_bucky.sql", "utf8");
+
+    expect(migration).toContain('CREATE TABLE "reconciliation_runs"');
+    expect(migration).toContain('CREATE TABLE "reconciliation_results"');
+    expect(migration).toContain('CREATE TABLE "health_findings"');
+    expect(migration).toContain('"expected_value" text');
+    expect(migration).toContain('"variance" text');
+    expect(migration).toContain('"tolerance" text');
+    expect(migration).toContain('CONSTRAINT "health_findings_status_check"');
+  });
 });

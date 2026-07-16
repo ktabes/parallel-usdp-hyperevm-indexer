@@ -29,6 +29,7 @@ import {
   runLifetimeActivityRange,
 } from "@/analytics/lifetime-activity";
 import { savingsChainAdapters } from "@/protocol/savings-chains";
+import { runVerificationSuite } from "@/verification/service";
 import { createDatabase } from "@/db/client";
 import {
   DEFAULT_INDEXER_SCOPE,
@@ -649,6 +650,53 @@ async function showSavingsHistory() {
   }
 }
 
+async function verifyDataIntegrity() {
+  const env = parseRuntimeEnv(process.env);
+  const chainSlug = argument("--chain") ?? "hyperevm";
+  const adapter = savingsChainAdapters.find(
+    (candidate) => candidate.chainSlug === chainSlug,
+  );
+  if (!adapter) throw new Error(`Unsupported verification chain: ${chainSlug}`);
+  const rpcUrl = env[adapter.rpcEnvKey];
+  if (!rpcUrl)
+    throw new Error(`${adapter.rpcEnvKey} is required to verify ${chainSlug}`);
+  const { pool } = createDatabase(env);
+  try {
+    const result = await runVerificationSuite({
+      pool,
+      adapter,
+      rpcUrl,
+      scope: requiredArgument("--scope"),
+      fromBlock: BigInt(requiredArgument("--from-block")),
+      toBlock: BigInt(requiredArgument("--to-block")),
+    });
+    const problems = [
+      ...result.reconciliations.filter((item) => item.status !== "pass"),
+      ...result.health.filter((item) => item.status !== "pass"),
+    ];
+    console.log(
+      JSON.stringify(
+        {
+          status: result.status,
+          runId: result.runId,
+          chainId: result.chainId,
+          chainSlug: result.chainSlug,
+          scope: result.scope,
+          fromBlock: result.fromBlock,
+          toBlock: result.toBlock,
+          summary: result.summary,
+          problems,
+        },
+        null,
+        2,
+      ),
+    );
+    if (result.status === "fail") process.exitCode = 2;
+  } finally {
+    await pool.end();
+  }
+}
+
 async function calculateYield() {
   const env = parseRuntimeEnv(process.env);
   const { pool } = createDatabase(env);
@@ -717,6 +765,9 @@ async function main() {
     case "verify-coverage":
       await showCoverage();
       return;
+    case "verify":
+      await verifyDataIntegrity();
+      return;
     case "derive-flows":
       await deriveFlows();
       return;
@@ -761,7 +812,7 @@ async function main() {
       return;
     default:
       throw new Error(
-        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|derive-flows|snapshot|snapshot-all|history-plan|history-boundaries|history-backfill|history-reconcile|lifetime-plan|lifetime-backfill|calculate-yield|state|yield|rates|price|global|history>",
+        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|verify|derive-flows|snapshot|snapshot-all|history-plan|history-boundaries|history-backfill|history-reconcile|lifetime-plan|lifetime-backfill|calculate-yield|state|yield|rates|price|global|history>",
       );
   }
 }
