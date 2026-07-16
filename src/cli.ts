@@ -19,6 +19,8 @@ import {
   resolveAlignedSavingsHistoryRanges,
   runSavingsHistoryRange,
 } from "@/analytics/savings-history";
+import { reconcileLatestSavingsYield } from "@/analytics/yield-reconciliation";
+import { savingsChainAdapters } from "@/protocol/savings-chains";
 import { createDatabase } from "@/db/client";
 import {
   DEFAULT_INDEXER_SCOPE,
@@ -475,6 +477,28 @@ async function backfillSavingsHistory() {
   }
 }
 
+async function reconcileSavingsHistory() {
+  const env = parseRuntimeEnv(process.env);
+  const requested = new Set(requestedHistoryChains());
+  const adapters = savingsChainAdapters.filter((adapter) =>
+    requested.has(adapter.chainSlug),
+  );
+  const missing = [...requested].filter(
+    (slug) => !adapters.some((adapter) => adapter.chainSlug === slug),
+  );
+  if (missing.length > 0)
+    throw new Error(`Unknown savings chains: ${missing.join(", ")}`);
+  const { pool } = createDatabase(env);
+  try {
+    const results = [];
+    for (const adapter of adapters)
+      results.push(await reconcileLatestSavingsYield(pool, adapter));
+    console.log(JSON.stringify({ status: "completed", results }, null, 2));
+  } finally {
+    await pool.end();
+  }
+}
+
 async function showGlobalSavings() {
   const env = parseRuntimeEnv(process.env);
   const { pool } = createDatabase(env);
@@ -590,6 +614,9 @@ async function main() {
     case "history-backfill":
       await backfillSavingsHistory();
       return;
+    case "history-reconcile":
+      await reconcileSavingsHistory();
+      return;
     case "calculate-yield":
       await calculateYield();
       return;
@@ -607,7 +634,7 @@ async function main() {
       return;
     default:
       throw new Error(
-        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|derive-flows|snapshot|snapshot-all|history-plan|history-boundaries|history-backfill|calculate-yield|state|yield|rates|price|global|history>",
+        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|derive-flows|snapshot|snapshot-all|history-plan|history-boundaries|history-backfill|history-reconcile|calculate-yield|state|yield|rates|price|global|history>",
       );
   }
 }

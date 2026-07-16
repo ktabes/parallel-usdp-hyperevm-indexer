@@ -51,6 +51,7 @@ npm run cli -- snapshot-all
 npm run cli -- history-plan --days 7
 npm run cli -- history-boundaries --days 7
 npm run cli -- history-backfill --chain base --days 7
+npm run cli -- history-reconcile --chains base,sonic,avalanche
 npm run cli -- history
 npm run cli -- calculate-yield --from-block START --to-block END
 npm run cli -- state
