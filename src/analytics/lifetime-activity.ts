@@ -29,6 +29,14 @@ const lifetimeBlockRpcUrls: Partial<Record<number, string>> = {
   8453: "https://base-mainnet.public.blastapi.io",
 };
 
+export function lifetimeBlockRpcUrl(
+  chainId: number,
+  stateRpcUrl: string,
+  logRpcUrl?: string,
+) {
+  return lifetimeBlockRpcUrls[chainId] ?? (logRpcUrl ? stateRpcUrl : undefined);
+}
+
 export interface LifetimeActivityRange {
   adapter: SavingsChainAdapter;
   rpcUrl: string;
@@ -156,7 +164,11 @@ export async function runLifetimeActivityRange(
       retryRateLimitsIndefinitely: false,
       anchorEveryChunks: 100,
       fetchConcurrency: 1,
-      blockRpcUrl: lifetimeBlockRpcUrls[adapter.chainId],
+      blockRpcUrl: lifetimeBlockRpcUrl(
+        adapter.chainId,
+        options.range.rpcUrl,
+        options.logRpcUrl,
+      ),
       blockFetchConcurrency:
         lifetimeBlockFetchConcurrency[adapter.chainId] ?? 10,
       blockFetchBatchSize: adapter.chainId === 8453 ? 10 : 1,

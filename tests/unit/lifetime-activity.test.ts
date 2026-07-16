@@ -4,6 +4,7 @@ import {
   lifetimeActivityFromBlock,
   lifetimeActivityRequestCount,
   lifetimeActivityScope,
+  lifetimeBlockRpcUrl,
 } from "@/analytics/lifetime-activity";
 import { savingsChainAdapters } from "@/protocol/savings-chains";
 
@@ -50,6 +51,20 @@ describe("lifetime dual-asset activity planning", () => {
     expect(capLifetimeActivityRange(range, 600n)).toBe(range);
     expect(() => capLifetimeActivityRange(range, 99n)).toThrow(
       /precedes deployment block/,
+    );
+  });
+
+  it("keeps historical log and state block providers in separate roles", () => {
+    expect(
+      lifetimeBlockRpcUrl(
+        1,
+        "https://ethereum-state.example",
+        "https://ethereum-logs.example",
+      ),
+    ).toBe("https://ethereum-state.example");
+    expect(lifetimeBlockRpcUrl(1, "https://ethereum.example")).toBeUndefined();
+    expect(lifetimeBlockRpcUrl(8453, "https://base.example")).toBe(
+      "https://base-mainnet.public.blastapi.io",
     );
   });
 });
