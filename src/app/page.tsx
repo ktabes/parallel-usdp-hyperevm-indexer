@@ -10,13 +10,86 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const chainInitials: Record<string, string> = {
-  ethereum: "Ξ",
-  base: "B",
-  sonic: "S",
-  hyperevm: "H",
-  avalanche: "A",
+const chainColors: Record<string, string> = {
+  ethereum: "#627eea",
+  base: "#0052ff",
+  sonic: "#ffffff",
+  hyperevm: "#97fce4",
+  avalanche: "#e84142",
 };
+
+function ChainLogo({ slug, name }: { slug: string; name: string }) {
+  const common = {
+    viewBox: "0 0 32 32",
+    role: "img",
+    "aria-label": `${name} logo`,
+  } as const;
+
+  const mark = (() => {
+    switch (slug) {
+      case "ethereum":
+        return (
+          <svg {...common}>
+            <path fill="#fff" d="M16 3 8.5 16.2 16 12.8l7.5 3.4L16 3Z" />
+            <path fill="#c8d2ff" d="m8.5 17.7 7.5 11.1V14.3l-7.5 3.4Z" />
+            <path fill="#fff" d="M16 14.3v14.5l7.5-11.1-7.5-3.4Z" />
+          </svg>
+        );
+      case "base":
+        return (
+          <svg {...common}>
+            <rect width="32" height="32" rx="7" fill="#0052ff" />
+          </svg>
+        );
+      case "sonic":
+        return (
+          <svg {...common}>
+            <circle cx="16" cy="16" r="16" fill="#fff" />
+            <path
+              fill="#111"
+              d="M6.5 10.2c4.4 1.7 8 2.2 12.7 1.3 2.2-.4 4.1-.4 6.3.1-2.8 2.4-5.8 3.6-9.5 3.6s-6.7-1.4-9.5-5Zm0 11.6c4.4-1.7 8-2.2 12.7-1.3 2.2.4 4.1.4 6.3-.1-2.8-2.4-5.8-3.6-9.5-3.6s-6.7 1.4-9.5 5Z"
+            />
+          </svg>
+        );
+      case "hyperevm":
+        return (
+          <svg {...common}>
+            <rect width="32" height="32" rx="16" fill="#97fce4" />
+            <path
+              fill="#07110f"
+              d="M5.5 17.2c2.5-5.1 5.4-7.6 8-6.2 1.7.9 2.6 3.4 4.1 3.2 2-.2 3.8-3.2 8.9-3.7-2.4 5.4-5.2 8.7-8.1 8.2-2-.3-2.7-3-4.5-3.2-2-.2-3.8 1.9-5.4 4.5l-3-2.8Z"
+            />
+          </svg>
+        );
+      case "avalanche":
+        return (
+          <svg {...common}>
+            <circle cx="16" cy="16" r="16" fill="#e84142" />
+            <path
+              fill="#fff"
+              d="m15.1 7.2-7.3 13c-.7 1.2-.1 2.1 1.2 2.1h3.1c1.2 0 1.8-.5 2.4-1.6l4.5-8c.5-.9.5-1.6 0-2.5l-1.5-3c-.6-1.1-1.8-1.1-2.4 0Zm7.2 9.4-2.8 4.9c-.4.7 0 1.3.8 1.3h3.7c.8 0 1.2-.6.8-1.3L22 16.6c-.4-.7-1.2-.7-1.7 0Z"
+            />
+          </svg>
+        );
+      default:
+        return <span>{name[0]}</span>;
+    }
+  })();
+
+  return (
+    <span
+      className={`chain-logo chain-logo-${slug}`}
+      style={
+        {
+          "--chain-color": chainColors[slug] ?? "#c9ff4b",
+        } as React.CSSProperties
+      }
+      title={name}
+    >
+      {mark}
+    </span>
+  );
+}
 
 function decimal(value: string | null, decimals = 18, fractionDigits = 2) {
   if (value === null) return "Unavailable";
@@ -39,6 +112,34 @@ function compact(value: string | null, decimals = 18) {
 function percentage(value: string | null) {
   if (value === null) return "Unavailable";
   return `${decimal((BigInt(value) * 100n).toString(), 18, 2)}%`;
+}
+
+function sum(values: Array<string | null | undefined>) {
+  return values.reduce<bigint>((total, value) => total + BigInt(value ?? 0), 0n);
+}
+
+function shareOf(value: string | bigint, total: string | bigint) {
+  const numerator = BigInt(value);
+  const denominator = BigInt(total);
+  if (denominator === 0n) return 0;
+  return Number((numerator * 100_000n) / denominator) / 1_000;
+}
+
+function price(value: string | null) {
+  if (value === null) return "—";
+  const amount = Number(value) / 1e18;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+  }).format(amount);
+}
+
+function pegDistance(value: string | null) {
+  if (value === null) return "—";
+  const distance = ((Number(value) / 1e18 - 1) * 100).toFixed(3);
+  return `${Number(distance) >= 0 ? "+" : ""}${distance}% vs $1`;
 }
 
 function metricLabel(metric: MetricValue) {
@@ -83,6 +184,22 @@ export default async function Home() {
   const totalAssets = data.marketRow.tvlUsdp.value
     ? BigInt(data.marketRow.tvlUsdp.value)
     : 0n;
+  const savingsSupply = BigInt(
+    data.detail.usdpSupply.onSavingsChains.value ?? "0",
+  );
+  const totalShares = sum(
+    data.detail.chainBreakdown.map((chain) => chain.susdpTotalSupply),
+  );
+  const actualAssets = sum(
+    data.detail.chainBreakdown.map((chain) => chain.susdpActualAssets),
+  );
+  const pendingYield = sum(
+    data.detail.chainBreakdown.map((chain) => chain.susdpPendingYield),
+  );
+  const portfolioSharePrice =
+    totalShares > 0n ? (totalAssets * 10n ** 18n) / totalShares : 0n;
+  const vaultCapture = shareOf(totalAssets, savingsSupply);
+  const pendingYieldShare = shareOf(pendingYield, totalAssets);
   const verifiedHistory = data.trust.verifiedHistoricalChainIds.length;
 
   return (
@@ -97,6 +214,7 @@ export default async function Home() {
         </a>
         <nav aria-label="Page navigation">
           <a href="#overview">Overview</a>
+          <a href="#assets">Assets</a>
           <a href="#chains">Chains</a>
           <a href="#yield">Yield</a>
           <a href="#methodology">Trust layer</a>
@@ -129,9 +247,11 @@ export default async function Home() {
         <div className="hero-side">
           <div className="chain-stack" aria-label="Supported savings chains">
             {data.detail.chainBreakdown.map((chain) => (
-              <span key={chain.chainId} title={chain.chainName}>
-                {chainInitials[chain.chainSlug] ?? chain.chainName[0]}
-              </span>
+              <ChainLogo
+                key={chain.chainId}
+                slug={chain.chainSlug}
+                name={chain.chainName}
+              />
             ))}
           </div>
           <div className="live-state">
@@ -145,6 +265,14 @@ export default async function Home() {
         id="overview"
         aria-label="Asset overview"
       >
+        <article className="metric-card featured usdp-metric">
+          <div className="metric-card-head">
+            <p>USDp price</p>
+            <MetricStatus metric={headline.usdpPriceUsd} />
+          </div>
+          <strong>{price(headline.usdpPriceUsd.value)}</strong>
+          <small>{pegDistance(headline.usdpPriceUsd.value)} · DIA market</small>
+        </article>
         <article className="metric-card featured">
           <div className="metric-card-head">
             <p>sUSDp TVL</p>
@@ -157,6 +285,16 @@ export default async function Home() {
           </strong>
           <small>
             {decimal(headline.tvlUsdp.value)} USDp · five-chain total
+          </small>
+        </article>
+        <article className="metric-card">
+          <div className="metric-card-head">
+            <p>sUSDp market price</p>
+            <MetricStatus metric={headline.susdpMarketPriceUsd} />
+          </div>
+          <strong>{price(headline.susdpMarketPriceUsd.value)}</strong>
+          <small>
+            {decimal(portfolioSharePrice.toString(), 18, 4)} USDp vault value
           </small>
         </article>
         <article className="metric-card">
@@ -190,15 +328,139 @@ export default async function Home() {
           <strong>
             {compact(data.detail.usdpSupply.onSavingsChains.value)}
           </strong>
-          <small>24-chain global supply remains unavailable</small>
+          <small>Across the five official savings deployments</small>
         </article>
+      </section>
+
+      <section className="asset-story" id="assets">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Asset fundamentals</p>
+            <h2>One stablecoin, one yield-bearing share</h2>
+          </div>
+          <p>
+            USDp supply, sUSDp vault accounting, market prices, and the
+            ERC-4626 relationship are shown as separate but connected layers.
+          </p>
+        </div>
+
+        <div className="asset-story-grid">
+          <article className="asset-profile usdp-profile">
+            <div className="asset-profile-head">
+              <div className="profile-token">$</div>
+              <div>
+                <p>Parallel stablecoin</p>
+                <h3>USDp</h3>
+              </div>
+              <span>Underlying</span>
+            </div>
+            <div className="profile-stat-grid">
+              <div>
+                <small>Market price</small>
+                <strong>{price(headline.usdpPriceUsd.value)}</strong>
+                <span>{pegDistance(headline.usdpPriceUsd.value)}</span>
+              </div>
+              <div>
+                <small>Observed supply</small>
+                <strong>{compact(savingsSupply.toString())}</strong>
+                <span>USDp · savings chains</span>
+              </div>
+              <div>
+                <small>Vaulted into sUSDp</small>
+                <strong>{vaultCapture.toFixed(2)}%</strong>
+                <span>{compact(totalAssets.toString())} USDp</span>
+              </div>
+              <div>
+                <small>Registered deployments</small>
+                <strong>{data.asset.stablecoin.expectedDeploymentCount}</strong>
+                <span>cross-chain addresses</span>
+              </div>
+            </div>
+            <div className="distribution-chart">
+              <div className="chart-label">
+                <span>Supply on savings chains</span>
+                <small>{compact(savingsSupply.toString())} USDp</small>
+              </div>
+              {data.detail.chainBreakdown.map((chain) => {
+                const share = shareOf(chain.usdpTotalSupply, savingsSupply);
+                return (
+                  <div className="distribution-row" key={chain.chainId}>
+                    <ChainLogo slug={chain.chainSlug} name={chain.chainName} />
+                    <span>{chain.chainName}</span>
+                    <div><i style={{ width: `${Math.max(share, 0.35)}%` }} /></div>
+                    <strong>{share.toFixed(1)}%</strong>
+                  </div>
+                );
+              })}
+            </div>
+          </article>
+
+          <div className="asset-bridge" aria-label="USDp to sUSDp relationship">
+            <span>Deposit</span>
+            <i aria-hidden="true">→</i>
+            <div>
+              <small>ERC-4626 exchange rate</small>
+              <strong>1 sUSDp</strong>
+              <span>= {decimal(portfolioSharePrice.toString(), 18, 4)} USDp</span>
+            </div>
+            <i aria-hidden="true">→</i>
+            <span>Redeem</span>
+          </div>
+
+          <article className="asset-profile susdp-profile">
+            <div className="asset-profile-head">
+              <div className="profile-token">P</div>
+              <div>
+                <p>ERC-4626 savings token</p>
+                <h3>sUSDp</h3>
+              </div>
+              <span>Yield-bearing</span>
+            </div>
+            <div className="profile-stat-grid">
+              <div>
+                <small>Market price</small>
+                <strong>{price(headline.susdpMarketPriceUsd.value)}</strong>
+                <span>DIA market</span>
+              </div>
+              <div>
+                <small>Total assets</small>
+                <strong>{compact(totalAssets.toString())}</strong>
+                <span>USDp in vaults</span>
+              </div>
+              <div>
+                <small>Shares outstanding</small>
+                <strong>{compact(totalShares.toString())}</strong>
+                <span>sUSDp</span>
+              </div>
+              <div>
+                <small>Estimated APY</small>
+                <strong>{percentage(headline.estimatedApy.value)}</strong>
+                <span>TVL-weighted</span>
+              </div>
+            </div>
+            <div className="backing-chart">
+              <div className="chart-label">
+                <span>Vault asset composition</span>
+                <small>{decimal(totalAssets.toString())} USDp</small>
+              </div>
+              <div className="backing-bar" aria-label="Actual assets and pending yield">
+                <span style={{ width: `${100 - pendingYieldShare}%` }} />
+                <i style={{ width: `${pendingYieldShare}%` }} />
+              </div>
+              <div className="backing-legend">
+                <div><i /><span>Actual assets</span><strong>{compact(actualAssets.toString())}</strong></div>
+                <div><i /><span>Pending yield</span><strong>{compact(pendingYield.toString())}</strong></div>
+              </div>
+            </div>
+          </article>
+        </div>
       </section>
 
       <section className="panel chain-panel" id="chains">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Current state</p>
-            <h2>Five chains, one savings asset</h2>
+            <h2>USDp liquidity and sUSDp yield by chain</h2>
           </div>
           <p>
             Every component is a finalized contract read with its own block,
@@ -211,6 +473,7 @@ export default async function Home() {
             <thead>
               <tr>
                 <th>Chain</th>
+                <th>USDp supply</th>
                 <th>sUSDp TVL</th>
                 <th>Share price</th>
                 <th>Estimated APY</th>
@@ -231,14 +494,16 @@ export default async function Home() {
                   <tr key={chain.chainId}>
                     <td>
                       <div className="chain-name">
-                        <span>
-                          {chainInitials[chain.chainSlug] ?? chain.chainName[0]}
-                        </span>
+                        <ChainLogo slug={chain.chainSlug} name={chain.chainName} />
                         <div>
                           <strong>{chain.chainName}</strong>
                           <small>Chain ID {chain.chainId}</small>
                         </div>
                       </div>
+                    </td>
+                    <td>
+                      <strong>{compact(chain.usdpTotalSupply)} USDp</strong>
+                      <small>{shareOf(chain.usdpTotalSupply, savingsSupply).toFixed(1)}% of observed supply</small>
                     </td>
                     <td>
                       <strong>{compact(chain.susdpTotalAssets)} USDp</strong>
@@ -257,7 +522,7 @@ export default async function Home() {
                       >
                         {chain.ypoSevenDay.value
                           ? `${decimal(chain.ypoSevenDay.value, 18, 3)} USDp`
-                          : "Backfilling"}
+                          : "—"}
                       </span>
                     </td>
                     <td>
@@ -304,7 +569,13 @@ export default async function Home() {
               const value = Number(point.nativeYpo) / 1e18;
               return (
                 <div className="yield-row" key={point.chainId}>
-                  <span>{point.chainSlug}</span>
+                  <span>
+                    <ChainLogo
+                      slug={point.chainSlug}
+                      name={data.detail.chainBreakdown.find((chain) => chain.chainId === point.chainId)?.chainName ?? point.chainSlug}
+                    />
+                    {point.chainSlug}
+                  </span>
                   <div>
                     <i
                       style={{
