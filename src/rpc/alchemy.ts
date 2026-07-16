@@ -1,5 +1,6 @@
 const ALCHEMY_HYPEREVM_RPC_BASE =
   "https://hyperliquid-mainnet.g.alchemy.com/v2";
+const ALCHEMY_ETHEREUM_RPC_BASE = "https://eth-mainnet.g.alchemy.com/v2";
 
 export const ONFINALITY_PUBLIC_ARCHIVE_RPC_URL =
   "https://hyperliquid.api.onfinality.io/evm/public";
@@ -9,6 +10,11 @@ const ONFINALITY_HYPEREVM_RPC_BASE =
 export function alchemyRpcUrl(apiKey: string) {
   if (apiKey.trim() === "") throw new Error("ALCHEMY_API_KEY is empty");
   return `${ALCHEMY_HYPEREVM_RPC_BASE}/${encodeURIComponent(apiKey)}`;
+}
+
+export function ethereumAlchemyRpcUrl(apiKey: string) {
+  if (apiKey.trim() === "") throw new Error("ALCHEMY_API_KEY is empty");
+  return `${ALCHEMY_ETHEREUM_RPC_BASE}/${encodeURIComponent(apiKey)}`;
 }
 
 export function onfinalityArchiveRpcUrl(apiKey?: string) {

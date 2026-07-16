@@ -34,17 +34,32 @@ interface GlobalYieldRow {
 }
 
 export async function readLatestSavingsHistory(pool: Pool) {
-  const [chains, global] = await Promise.all([
-    pool.query<ChainYieldRow>(
-      `select distinct on (chain_id) *
-         from savings_yield_aggregates
-        order by chain_id, window_end desc, created_at desc`,
-    ),
-    pool.query<GlobalYieldRow>(
-      `select * from global_savings_yield_aggregates
-        order by window_end desc, created_at desc limit 1`,
-    ),
-  ]);
+  const global = await pool.query<GlobalYieldRow>(
+    `select * from global_savings_yield_aggregates
+      order by window_end desc, created_at desc limit 1`,
+  );
+  const globalRow = global.rows[0];
+  const alignedScopePattern = globalRow
+    ? `%-${Math.floor(globalRow.window_start.getTime() / 1_000)}-${Math.floor(
+        globalRow.window_end.getTime() / 1_000,
+      )}-v1`
+    : null;
+  const chains = globalRow
+    ? await pool.query<ChainYieldRow>(
+        `select distinct on (chain_id) *
+           from savings_yield_aggregates
+          where coverage_scope like $1
+          order by chain_id, created_at desc`,
+        [alignedScopePattern],
+      )
+    : await pool.query<ChainYieldRow>(
+        `select distinct on (chain_id) *
+           from savings_yield_aggregates
+          where window_end - window_start
+                between interval '6 days 23 hours'
+                    and interval '7 days 1 hour'
+          order by chain_id, window_end desc, created_at desc`,
+      );
   if (chains.rows.length === 0)
     return {
       status: "unavailable" as const,
@@ -53,7 +68,6 @@ export async function readLatestSavingsHistory(pool: Pool) {
       chains: [],
       global: null,
     };
-  const globalRow = global.rows[0];
   return {
     status: globalRow?.coverage_status ?? ("partial" as const),
     chains: chains.rows.map((row) => ({

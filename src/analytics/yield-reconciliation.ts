@@ -173,6 +173,8 @@ export function reconcileConstantRateWindow(input: ReconciliationInput) {
 
 interface YieldReconciliationRow {
   id: string;
+  from_block: string;
+  to_block: string;
   native_ypo: string;
   accrued_interest: string;
   start_total_assets: string;
@@ -187,12 +189,14 @@ interface YieldReconciliationRow {
   end_timestamp: Date;
 }
 
-export async function reconcileLatestSavingsYield(
+export async function reconcileSavingsYield(
   pool: Pool,
   adapter: SavingsChainAdapter,
+  savingsYieldId?: string,
 ) {
   const result = await pool.query<YieldReconciliationRow>(
-    `select sya.id, sya.native_ypo, sya.accrued_interest,
+    `select sya.id, sya.from_block, sya.to_block,
+            sya.native_ypo, sya.accrued_interest,
             start.susdp_total_assets as start_total_assets,
             start.susdp_actual_assets as start_actual_assets,
             start.susdp_rate as start_rate,
@@ -207,8 +211,9 @@ export async function reconcileLatestSavingsYield(
        join savings_chain_snapshots start on start.id = sya.start_snapshot_id
        join savings_chain_snapshots finish on finish.id = sya.end_snapshot_id
       where sya.chain_id = $1
+        and ($2::bigint is null or sya.id = $2::bigint)
       order by sya.window_end desc, sya.created_at desc limit 1`,
-    [adapter.chainId],
+    [adapter.chainId, savingsYieldId ?? null],
   );
   const row = result.rows[0];
   if (!row)
@@ -233,14 +238,131 @@ export async function reconcileLatestSavingsYield(
     accruedInterest: BigInt(row.accrued_interest),
     nativeYpo: BigInt(row.native_ypo),
   });
-  if (reconciliation.status === "verified")
+  let resolvedReconciliation:
+    | typeof reconciliation
+    | {
+        status: "verified" | "invalid";
+        reason:
+          | "segmented_rate_integration_exact"
+          | "event_pending_and_rate_state_exact"
+          | "rate_state_integration_mismatch";
+        independentlyIntegratedYpo: string;
+        ypoDelta: string;
+        predictedTotalAssetsAtEnd: string;
+        totalAssetsEndDelta: string;
+        predictedActualAssetsAtEnd: string;
+        actualAssetsEndDelta: string;
+        predictedRateAtEnd: string;
+        rateEndDelta: string;
+        predictedLastUpdateAtEnd: string;
+        lastUpdateEndDelta: string;
+        accruedVariance: string;
+      } = reconciliation;
+  if (reconciliation.status === "candidate") {
+    const events = await pool.query<{
+      block_timestamp: Date;
+      log_index: number;
+      event_name: "Accrued" | "Deposit" | "Withdraw" | "RateUpdated";
+      payload: Record<string, string>;
+    }>(
+      `select block.timestamp as block_timestamp, event.log_index,
+              event.event_name, event.payload
+         from protocol_events event
+         join blocks block on block.chain_id = event.chain_id
+                          and block.number = event.block_number
+        where event.chain_id = $1
+          and event.block_number > $2 and event.block_number <= $3
+          and event.contract_role = 'susdp-savings'
+          and event.event_name in ('Accrued','Deposit','Withdraw','RateUpdated')
+        order by event.block_number, event.log_index`,
+      [adapter.chainId, row.from_block, row.to_block],
+    );
+    const segmentedEvents = events.rows.map(
+      (event): SavingsRateSegmentEvent => {
+        const common = {
+          timestamp: BigInt(
+            Math.floor(event.block_timestamp.getTime() / 1_000),
+          ),
+          logIndex: event.log_index,
+        };
+        if (event.event_name === "Accrued")
+          return {
+            ...common,
+            eventName: "Accrued",
+            interest: BigInt(event.payload.interest ?? "0"),
+          };
+        if (event.event_name === "Deposit")
+          return {
+            ...common,
+            eventName: "Deposit",
+            assets: BigInt(event.payload.assets ?? "0"),
+          };
+        if (event.event_name === "Withdraw")
+          return {
+            ...common,
+            eventName: "Withdraw",
+            assets: BigInt(event.payload.assets ?? "0"),
+          };
+        return {
+          ...common,
+          eventName: "RateUpdated",
+          newRate: BigInt(event.payload.newRate ?? "0"),
+        };
+      },
+    );
+    const integrated = integrateSegmentedRateWindow({
+      actualAssetsAtStart: BigInt(row.start_actual_assets),
+      totalAssetsAtStart: BigInt(row.start_total_assets),
+      rateAtStart: BigInt(row.start_rate),
+      lastUpdateAtStart: BigInt(row.start_last_update),
+      blockTimestampAtStart: seconds(row.start_timestamp),
+      blockTimestampAtEnd: seconds(row.end_timestamp),
+      events: segmentedEvents,
+    });
+    const nativeYpo = BigInt(row.native_ypo);
+    const stateExact =
+      integrated.predictedTotalAssetsAtEnd === BigInt(row.end_total_assets) &&
+      integrated.actualAssetsAtEnd === BigInt(row.end_actual_assets) &&
+      integrated.rateAtEnd === BigInt(row.end_rate) &&
+      integrated.emittedAccruedInterest === BigInt(row.accrued_interest);
+    const ypoExact = integrated.integratedYpo === nativeYpo;
+    resolvedReconciliation = {
+      status: stateExact ? "verified" : "invalid",
+      reason: stateExact
+        ? ypoExact
+          ? "segmented_rate_integration_exact"
+          : "event_pending_and_rate_state_exact"
+        : "rate_state_integration_mismatch",
+      independentlyIntegratedYpo: integrated.integratedYpo.toString(),
+      ypoDelta: (integrated.integratedYpo - nativeYpo).toString(),
+      predictedTotalAssetsAtEnd:
+        integrated.predictedTotalAssetsAtEnd.toString(),
+      totalAssetsEndDelta: (
+        integrated.predictedTotalAssetsAtEnd - BigInt(row.end_total_assets)
+      ).toString(),
+      predictedActualAssetsAtEnd: integrated.actualAssetsAtEnd.toString(),
+      actualAssetsEndDelta: (
+        integrated.actualAssetsAtEnd - BigInt(row.end_actual_assets)
+      ).toString(),
+      predictedRateAtEnd: integrated.rateAtEnd.toString(),
+      rateEndDelta: (integrated.rateAtEnd - BigInt(row.end_rate)).toString(),
+      predictedLastUpdateAtEnd: integrated.lastUpdateAtEnd.toString(),
+      lastUpdateEndDelta: (
+        integrated.lastUpdateAtEnd - BigInt(row.end_last_update)
+      ).toString(),
+      accruedVariance: (
+        integrated.emittedAccruedInterest - BigInt(row.accrued_interest)
+      ).toString(),
+    };
+  }
+  if (resolvedReconciliation.status === "verified")
     await pool.query(
       `update savings_yield_aggregates
           set reconciliation_status = 'verified'
         where id = $1`,
       [row.id],
     );
-  else if (reconciliation.status === "invalid")
+  else if (resolvedReconciliation.status === "invalid")
     await pool.query(
       `update savings_yield_aggregates
           set reconciliation_status = 'invalid'
@@ -248,9 +370,16 @@ export async function reconcileLatestSavingsYield(
       [row.id],
     );
   return {
-    ...reconciliation,
+    ...resolvedReconciliation,
     savingsYieldId: row.id,
     chainId: adapter.chainId,
     chainSlug: adapter.chainSlug,
   };
+}
+
+export async function reconcileLatestSavingsYield(
+  pool: Pool,
+  adapter: SavingsChainAdapter,
+) {
+  return reconcileSavingsYield(pool, adapter);
 }

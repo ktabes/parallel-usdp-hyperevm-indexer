@@ -23,11 +23,15 @@ import {
   syncParallelAssetRegistry,
 } from "@/analytics/multichain-snapshots";
 import {
+  deriveLifetimeSavingsYieldFromCoverage,
   deriveSavingsHistoryFromCompleteCoverage,
   resolveAlignedSavingsHistoryRanges,
   runSavingsHistoryRange,
 } from "@/analytics/savings-history";
-import { reconcileLatestSavingsYield } from "@/analytics/yield-reconciliation";
+import {
+  reconcileLatestSavingsYield,
+  reconcileSavingsYield,
+} from "@/analytics/yield-reconciliation";
 import { createGlobalSavingsYield } from "@/analytics/multichain-yield";
 import {
   capLifetimeActivityRange,
@@ -37,7 +41,11 @@ import {
   resolveLifetimeActivityRanges,
   runLifetimeActivityRange,
 } from "@/analytics/lifetime-activity";
-import { savingsChainAdapters } from "@/protocol/savings-chains";
+import { lifetimeDashboardRanges } from "@/analytics/dashboard-readiness";
+import {
+  configuredSavingsChainAdapters,
+  savingsChainAdapters,
+} from "@/protocol/savings-chains";
 import { runVerificationSuite } from "@/verification/service";
 import { createDatabase } from "@/db/client";
 import {
@@ -51,6 +59,7 @@ import { discoverProtocol } from "@/protocol/discovery";
 import { runPublicRpcPreflight } from "@/protocol/preflight";
 import {
   alchemyRpcUrl,
+  ethereumAlchemyRpcUrl,
   onfinalityArchiveRpcUrl,
   redactSecrets,
 } from "@/rpc/alchemy";
@@ -645,6 +654,77 @@ async function deriveAlignedSavingsHistory() {
   }
 }
 
+async function deriveLifetimeSavingsYield() {
+  const env = parseRuntimeEnv(process.env);
+  const requestedChains = requestedHistoryChains();
+  if (requestedChains.length !== 1)
+    throw new Error("lifetime-yield requires exactly one --chain");
+  const chainSlug = requestedChains[0]!;
+  if (chainSlug === "hyperevm")
+    throw new Error(
+      "HyperEVM lifetime yield is unavailable until lifetime coverage exists",
+    );
+  const adapter = configuredSavingsChainAdapters(env).find(
+    (candidate) => candidate.chainSlug === chainSlug,
+  );
+  if (!adapter?.rpcUrl)
+    throw new Error(`Missing RPC configuration for ${chainSlug}`);
+  const dashboardRange = lifetimeDashboardRanges.find(
+    (candidate) =>
+      candidate.chainSlug === chainSlug &&
+      candidate.coverageKind === "lifetime",
+  );
+  if (!dashboardRange)
+    throw new Error(`Missing lifetime range for ${chainSlug}`);
+  if (!adapter.susdp.deploymentBlock)
+    throw new Error(`Missing sUSDp deployment block for ${chainSlug}`);
+  const { pool } = createDatabase(env);
+  try {
+    const derived = await deriveLifetimeSavingsYieldFromCoverage({
+      pool,
+      env,
+      adapter,
+      rpcUrl:
+        adapter.chainId === 1 && env.ALCHEMY_API_KEY
+          ? ethereumAlchemyRpcUrl(env.ALCHEMY_API_KEY)
+          : adapter.rpcUrl,
+      sourceScope: dashboardRange.scope,
+      fromBlock: adapter.susdp.deploymentBlock,
+      toBlock: dashboardRange.goalBlock,
+    });
+    if (derived.status !== "candidate") {
+      console.log(JSON.stringify(derived, null, 2));
+      throw new Error(`${adapter.chainName} lifetime YPO derivation failed`);
+    }
+    const reconciliation = await reconcileSavingsYield(
+      pool,
+      adapter,
+      derived.yield.savingsYieldId,
+    );
+    console.log(
+      JSON.stringify(
+        {
+          status:
+            reconciliation.status === "verified" ? "complete" : "unavailable",
+          chainId: adapter.chainId,
+          chainSlug: adapter.chainSlug,
+          coverageKind: "deployment-to-goal",
+          derived,
+          reconciliation,
+        },
+        null,
+        2,
+      ),
+    );
+    if (reconciliation.status !== "verified")
+      throw new Error(
+        `${adapter.chainName} lifetime YPO reconciliation did not verify`,
+      );
+  } finally {
+    await pool.end();
+  }
+}
+
 function optionalChunkSize() {
   const value = argument("--chunk-size");
   if (value === undefined) return undefined;
@@ -1020,6 +1100,9 @@ async function main() {
     case "lifetime-backfill":
       await backfillLifetimeActivity();
       return;
+    case "lifetime-yield":
+      await deriveLifetimeSavingsYield();
+      return;
     case "calculate-yield":
       await calculateYield();
       return;
@@ -1043,7 +1126,7 @@ async function main() {
       return;
     default:
       throw new Error(
-        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|verify|holders-replay|derive-flows|snapshot|snapshot-all|snapshot-usdp|history-plan|history-boundaries|history-backfill|history-derive|history-reconcile|lifetime-plan|lifetime-backfill|calculate-yield|state|yield|rates|price|global|global-usdp|range|history>",
+        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|verify|holders-replay|derive-flows|snapshot|snapshot-all|snapshot-usdp|history-plan|history-boundaries|history-backfill|history-derive|history-reconcile|lifetime-plan|lifetime-backfill|lifetime-yield|calculate-yield|state|yield|rates|price|global|global-usdp|range|history>",
       );
   }
 }

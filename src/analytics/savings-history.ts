@@ -331,6 +331,39 @@ export async function deriveSavingsHistoryFromCompleteCoverage(options: {
   }
 }
 
+export async function deriveLifetimeSavingsYieldFromCoverage(options: {
+  pool: Pool;
+  env: RuntimeEnv;
+  adapter: SavingsChainAdapter;
+  rpcUrl: string;
+  sourceScope: string;
+  fromBlock: bigint;
+  toBlock: bigint;
+}) {
+  const client = createEvmClient(options.adapter.chain, options.rpcUrl, {
+    minRequestIntervalMs: options.env.RPC_REQUEST_INTERVAL_MS,
+  });
+  const [from, to] = await Promise.all([
+    client.getBlock({ blockNumber: options.fromBlock }),
+    client.getBlock({ blockNumber: options.toBlock }),
+  ]);
+  return deriveSavingsHistoryFromCompleteCoverage({
+    pool: options.pool,
+    env: options.env,
+    sourceScope: options.sourceScope,
+    range: {
+      adapter: options.adapter,
+      rpcUrl: options.rpcUrl,
+      fromBlock: options.fromBlock,
+      toBlock: options.toBlock,
+      fromTimestamp: from.timestamp,
+      toTimestamp: to.timestamp,
+      targetWindowStart: from.timestamp,
+      targetWindowEnd: to.timestamp,
+    },
+  });
+}
+
 export async function runSavingsHistoryRange(
   options: RunSavingsHistoryOptions,
 ) {
