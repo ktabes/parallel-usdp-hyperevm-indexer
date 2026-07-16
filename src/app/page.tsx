@@ -854,7 +854,7 @@ export default async function Home() {
                         <strong>{whole(usdp?.activeHolders)}</strong>
                         <small>
                           {usdp
-                            ? `${whole(usdp.newHolders)} first-time holders`
+                            ? `${whole(usdp.newHolders)} unique holders`
                             : chain.coverageKind === "window"
                               ? "Lifetime holders not indexed"
                               : "Zero address excluded"}
