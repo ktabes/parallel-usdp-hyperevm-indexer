@@ -176,34 +176,6 @@ function price(value: string | null) {
   }).format(amount);
 }
 
-function pegDistance(value: string | null) {
-  if (value === null) return "—";
-  const distance = ((Number(value) / 1e18 - 1) * 100).toFixed(3);
-  return `${Number(distance) >= 0 ? "+" : ""}${distance}% vs $1`;
-}
-
-function metricLabel(metric: MetricValue) {
-  if (metric.availability === "stale") return "Source stale";
-  if (metric.availability === "unavailable") return "Awaiting coverage";
-  if (metric.verification === "verified") return "Reconciled";
-  if (metric.unit === "usd_atomic") return "External source";
-  if (metric.attribution?.includes("price")) return "Price-attributed";
-  if (metric.calculationVersion?.includes("global-usdp"))
-    return "24-chain onchain";
-  return "Finalized onchain";
-}
-
-function metricReason(reason: string | undefined) {
-  const labels: Record<string, string> = {
-    aligned_five_chain_reconciled_window_pending:
-      "Five chain windows verified; aligned global window pending",
-    chain_history_backfill_or_reconciliation_pending:
-      "History or reconciliation is still in progress",
-    source_snapshot_stale: "Source snapshot needs refresh",
-  };
-  return reason ? (labels[reason] ?? reason.replaceAll("_", " ")) : null;
-}
-
 function displayCalculationVersion(value: string | null) {
   return value?.replace(/-candidate$/, "") ?? "Version pending";
 }
@@ -212,15 +184,6 @@ function metricClass(metric: MetricValue) {
   if (metric.availability === "stale") return "warning";
   if (metric.availability === "unavailable") return "muted";
   return metric.verification === "verified" ? "verified" : "candidate";
-}
-
-function MetricStatus({ metric }: { metric: MetricValue }) {
-  return (
-    <span className={`metric-status ${metricClass(metric)}`}>
-      <span aria-hidden="true" />
-      {metricLabel(metric)}
-    </span>
-  );
 }
 
 function publicationLabel(status: string) {
@@ -315,46 +278,21 @@ export default async function Home() {
   return (
     <div className="app-frame">
       <header className="market-header">
-        <a className="brand" href="#top" aria-label="Parallel analytics home">
-          <span className="brand-mark">P</span>
-          <span>
-            <strong>Parallel Watch</strong>
-            <small>USDp + sUSDp analytics</small>
-          </span>
+        <a
+          className="stablewatch-wordmark"
+          href="#top"
+          aria-label="StableWatch"
+        >
+          stablewatch
         </a>
-        <div className="market-ticker" aria-label="Current asset metrics">
-          <div>
-            <span className="ticker-token">
-              <AssetLogo asset="usdp" size={28} />
-            </span>
-            <p>
-              <strong>USDp</strong>
-              <small>{price(headline.usdpPriceUsd.value)}</small>
-            </p>
-            <i>{pegDistance(headline.usdpPriceUsd.value)}</i>
-          </div>
-          <div>
-            <span className="ticker-token savings">
-              <AssetLogo asset="susdp" size={28} />
-            </span>
-            <p>
-              <strong>sUSDp</strong>
-              <small>{compact(totalAssets.toString())} TVL</small>
-            </p>
-            <i>{percentage(headline.estimatedApy.value)} APY</i>
-          </div>
-          <div>
-            <span className="ticker-network">5</span>
-            <p>
-              <strong>Networks</strong>
-              <small>Finalized state</small>
-            </p>
-            <i>{verifiedHistory}/5 YPO</i>
-          </div>
-        </div>
+        <nav className="market-breadcrumb" aria-label="Market navigation">
+          <a href="#overview">Market</a>
+          <span>›</span>
+          <a href="#top">Yield Bearing Stablecoins</a>
+        </nav>
         <div className="market-actions">
-          <a className="header-search" href="#assets">
-            <span aria-hidden="true">⌕</span> Explore assets
+          <a className="header-search" href="#methodology">
+            Methodology
           </a>
           <a
             className="api-link"
@@ -382,81 +320,60 @@ export default async function Home() {
           <a href="#yield">
             <span aria-hidden="true">%</span> Yield
           </a>
-          <p>Engineering</p>
           <a href="#methodology">
-            <span aria-hidden="true">◇</span> Trust layer
+            <span aria-hidden="true">◇</span> Methodology
           </a>
           <a href="/api/v1/stablewatch/assets/parallel-usdp-susdp">
             <span aria-hidden="true">{`{}`}</span> Integration API
           </a>
         </nav>
-        <div className="sidebar-card">
-          <span>StableWatch-ready</span>
-          <strong>Auditable by design</strong>
-          <p>Finalized blocks, exact arithmetic, and component provenance.</p>
-          <a href="#methodology">
-            Inspect methodology <i>→</i>
-          </a>
-        </div>
-        <div className="sidebar-footer">
-          <span>◐</span>
-          <small>Live finalized state</small>
-        </div>
       </aside>
 
       <main className="dashboard-shell">
         <header className="site-header">
           <div className="page-context">
-            <small>Analytics / Assets</small>
-            <strong>Parallel USDp + sUSDp</strong>
+            <small>Yield Bearing Stablecoins</small>
+            <strong>USDp + sUSDp</strong>
           </div>
-          <nav aria-label="Section shortcuts">
-            <a href="#overview">Market</a>
-            <a href="#chains">Networks</a>
-            <a href="#activity">Activity</a>
-            <a href="#yield">YPO</a>
-          </nav>
           <div className="header-state">
             <AutoRefresh generatedAt={data.generatedAt} />
-            <span className="finality-pill">
-              <i /> Finalized
-            </span>
           </div>
         </header>
 
         <section className="asset-hero" id="top">
-          <div className="asset-identity">
-            <div className="asset-lockup" aria-hidden="true">
-              <span className="token token-back">
-                <AssetLogo asset="usdp" size={60} />
-              </span>
-              <span className="token token-front">
-                <AssetLogo asset="susdp" size={60} />
-              </span>
+          <p className="asset-breadcrumb">
+            Yield Bearing Stablecoins <span>›</span> sUSDp
+          </p>
+          <h1>Yield Bearing Stablecoin sUSDp by Parallel</h1>
+          <div className="asset-summary-row">
+            <div className="asset-identity">
+              <div className="asset-lockup" aria-hidden="true">
+                <span className="token token-back">
+                  <AssetLogo asset="usdp" size={54} />
+                </span>
+                <span className="token token-front">
+                  <AssetLogo asset="susdp" size={54} />
+                </span>
+              </div>
+              <div>
+                <strong>sUSDp</strong>
+                <small>Parallel V3 · backed by USDp</small>
+              </div>
             </div>
-            <div>
-              <p className="eyebrow">Parallel V3 · Cross-chain savings</p>
-              <h1>
-                USDp <span>/</span> sUSDp
-              </h1>
-              <p className="hero-copy">
-                Auditable stablecoin and ERC-4626 savings analytics across every
-                official sUSDp deployment.
-              </p>
-            </div>
-          </div>
-          <div className="hero-side">
-            <div className="chain-stack" aria-label="Supported savings chains">
-              {data.detail.chainBreakdown.map((chain) => (
-                <ChainLogo
-                  key={chain.chainId}
-                  slug={chain.chainSlug}
-                  name={chain.chainName}
-                />
-              ))}
-            </div>
-            <div className="live-state">
-              <span /> Live finalized state
+            <div className="hero-chains">
+              <span>Chains:</span>
+              <div
+                className="chain-stack"
+                aria-label="Supported savings chains"
+              >
+                {data.detail.chainBreakdown.map((chain) => (
+                  <ChainLogo
+                    key={chain.chainId}
+                    slug={chain.chainSlug}
+                    name={chain.chainName}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -466,20 +383,33 @@ export default async function Home() {
           id="overview"
           aria-label="Asset overview"
         >
-          <article className="metric-card featured usdp-metric">
+          <article className="metric-card usdp-metric">
             <div className="metric-card-head">
               <p>USDp price</p>
-              <MetricStatus metric={headline.usdpPriceUsd} />
+              <span className="metric-glyph asset-glyph">
+                <AssetLogo asset="usdp" size={20} />
+              </span>
             </div>
             <strong>{price(headline.usdpPriceUsd.value)}</strong>
+            <small>Market price · $1.00 target</small>
+          </article>
+          <article className="metric-card">
+            <div className="metric-card-head">
+              <p>sUSDp price</p>
+              <span className="metric-glyph asset-glyph">
+                <AssetLogo asset="susdp" size={20} />
+              </span>
+            </div>
+            <strong>{price(headline.susdpMarketPriceUsd.value)}</strong>
             <small>
-              {pegDistance(headline.usdpPriceUsd.value)} · DIA market
+              1 sUSDp = {decimal(portfolioSharePrice.toString(), 18, 4)} USDp in
+              the vault
             </small>
           </article>
-          <article className="metric-card featured">
+          <article className="metric-card">
             <div className="metric-card-head">
-              <p>sUSDp vault TVL</p>
-              <MetricStatus metric={headline.tvlUsdEstimate} />
+              <p>sUSDp TVL</p>
+              <span className="metric-glyph">▣</span>
             </div>
             <strong>
               {headline.tvlUsdEstimate.value
@@ -487,49 +417,39 @@ export default async function Home() {
                 : `${compact(headline.tvlUsdp.value)} USDp`}
             </strong>
             <small>
-              {decimal(headline.tvlUsdp.value)} USDp · five-chain total
-            </small>
-          </article>
-          <article className="metric-card">
-            <div className="metric-card-head">
-              <p>sUSDp market price</p>
-              <MetricStatus metric={headline.susdpMarketPriceUsd} />
-            </div>
-            <strong>{price(headline.susdpMarketPriceUsd.value)}</strong>
-            <small>
-              {decimal(portfolioSharePrice.toString(), 18, 4)} USDp vault value
+              {decimal(headline.tvlUsdp.value)} USDp deposited across five
+              chains
             </small>
           </article>
           <article className="metric-card">
             <div className="metric-card-head">
               <p>Estimated APY</p>
-              <MetricStatus metric={headline.estimatedApy} />
+              <span className="metric-glyph">%</span>
             </div>
             <strong>{percentage(headline.estimatedApy.value)}</strong>
-            <small>TVL-weighted onchain rate · not trailing APY</small>
+            <small>Current TVL-weighted savings rate</small>
           </article>
           <article className="metric-card">
             <div className="metric-card-head">
               <p>7-day Yield Paid Out</p>
-              <MetricStatus metric={headline.ypoSevenDay} />
+              <span className="metric-glyph">↗</span>
             </div>
             <strong>
               {headline.ypoSevenDay.value
                 ? `${decimal(headline.ypoSevenDay.value, 18, 4)} USDp`
                 : `${verifiedHistory}/5 chains`}
             </strong>
-            <small>
-              {metricReason(headline.ypoSevenDay.reason) ??
-                "Aligned and independently reconciled"}
-            </small>
+            <small>Yield paid to sUSDp holders over the last 7 days</small>
           </article>
           <article className="metric-card">
             <div className="metric-card-head">
               <p>Global USDp supply</p>
-              <MetricStatus metric={data.detail.usdpSupply.global} />
+              <span className="metric-glyph">Σ</span>
             </div>
-            <strong>{compact(data.detail.usdpSupply.global.value)}</strong>
-            <small>Aligned across all 24 registered deployments</small>
+            <strong>
+              {decimal(data.detail.usdpSupply.global.value, 18, 2)} USDp
+            </strong>
+            <small>Observed across all 24 USDp deployments</small>
           </article>
         </section>
 
@@ -561,11 +481,11 @@ export default async function Home() {
                 <div>
                   <small>Market price</small>
                   <strong>{price(headline.usdpPriceUsd.value)}</strong>
-                  <span>{pegDistance(headline.usdpPriceUsd.value)}</span>
+                  <span>$1.00 target</span>
                 </div>
                 <div>
                   <small>Global observed supply</small>
-                  <strong>{compact(globalSupply.toString())}</strong>
+                  <strong>{decimal(globalSupply.toString(), 18, 2)}</strong>
                   <span>USDp · 24 deployments</span>
                 </div>
                 <div>

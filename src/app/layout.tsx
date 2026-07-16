@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./styles.css";
 
 export const metadata: Metadata = {
-  title: "Parallel Watch · USDp + sUSDp Analytics",
+  title: "sUSDp by Parallel · StableWatch Integration Prototype",
   description:
     "Auditable cross-chain USDp and sUSDp state, yield, and coverage analytics.",
 };
