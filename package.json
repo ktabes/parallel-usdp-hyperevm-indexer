@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node --import tsx scripts/start-service.ts",
+    "start:web": "next start",
     "worker:hyperevm-history": "node --import tsx src/workers/hyperevm-history.ts",
     "cli": "node --import tsx src/cli.ts",
     "db:generate": "drizzle-kit generate",
