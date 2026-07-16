@@ -89,6 +89,17 @@ paths:
                 $ref: "#/components/schemas/RangeAnalytics"
         "400":
           description: Invalid range, chain, asset, or timestamp parameters
+  /api/analytics/history:
+    get:
+      operationId: getParallelSavingsHistory
+      summary: Get the latest verified per-chain and aligned global YPO intervals
+      responses:
+        "200":
+          description: Five chain-local intervals and their coverage-gated global sum
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavingsHistory"
 components:
   schemas:
     GlobalUsdpSupply:
@@ -140,6 +151,35 @@ components:
             additionalProperties: true
         global:
           type: object
+          additionalProperties: true
+      additionalProperties: false
+    SavingsHistory:
+      type: object
+      required: [status, chains, global]
+      properties:
+        status:
+          enum: [complete, partial, unavailable]
+        chains:
+          type: array
+          items:
+            type: object
+            required:
+              - chainId
+              - fromBlock
+              - toBlock
+              - windowStart
+              - windowEnd
+              - nativeYpo
+              - reconciliationStatus
+              - coverageScope
+            additionalProperties: true
+        global:
+          type: [object, "null"]
+          description: >-
+            Present only for a stored aligned window. Complete production
+            evidence includes five reconciled chains and exact native YPO
+            567518330008086395152 for the window ending
+            2026-07-16T00:59:17Z.
           additionalProperties: true
       additionalProperties: false
     MetricValue:

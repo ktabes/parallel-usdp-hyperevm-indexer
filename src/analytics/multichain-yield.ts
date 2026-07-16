@@ -227,10 +227,10 @@ export async function createGlobalSavingsYield(
             id, chain_id, native_ypo, reconciliation_status
        from savings_yield_aggregates
       where chain_id = any($1::int[])
-        and window_start >= $2 - interval '5 minutes'
-        and window_start <= $2 + interval '5 minutes'
-        and window_end >= $3 - interval '5 minutes'
-        and window_end <= $3 + interval '5 minutes'
+        and window_start >= $2::timestamptz - interval '5 minutes'
+        and window_start <= $2::timestamptz + interval '5 minutes'
+        and window_end >= $3::timestamptz - interval '5 minutes'
+        and window_end <= $3::timestamptz + interval '5 minutes'
       order by chain_id, created_at desc`,
     [expectedChainIds, windowStart, windowEnd],
   );

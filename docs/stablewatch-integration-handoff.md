@@ -2,7 +2,7 @@
 
 ## What is ready
 
-The service exposes one versioned StableWatch projection plus two supporting
+The service exposes one versioned StableWatch projection plus three supporting
 read-only evidence endpoints:
 
 `GET /api/v1/stablewatch/assets/parallel-usdp-susdp`
@@ -10,6 +10,8 @@ read-only evidence endpoints:
 `GET /api/analytics/usdp-supply`
 
 `GET /api/analytics/range?range=7d&chains=base&assets=usdp,susdp`
+
+`GET /api/analytics/history`
 
 Production base URL: <https://content-spirit-production-5efa.up.railway.app>
 
@@ -95,16 +97,18 @@ server-side Railway variables and are never part of the response.
 ## Known boundaries at handoff
 
 - Five-chain current sUSDp state is implemented.
-- The aligned seven-day history becomes global only after HyperEVM finishes and
-  reconciliation passes. Until then, the API correctly reports partial history.
+- The aligned seven-day history is complete across Ethereum, Base, Sonic,
+  HyperEVM, and Avalanche. The verified global native YPO is
+  `567518330008086395152` USDp base units for the pinned window ending
+  `2026-07-16T00:59:17Z`.
 - All 24 USDp deployments now have aligned current `totalSupply`, bytecode, and
   metadata evidence. The summed value is available as a candidate; it is not
   promoted to verified circulating supply until LayerZero bridge topology and
   message reconciliation pass.
 - The attributed USD price is currently a DIA observation from HyperEVM. The
   response labels this as candidate cross-chain attribution.
-- The range API can serve 30d, 90d, and all-time activity wherever lifetime
-  coverage is complete. Long-window YPO and aligned TVL/APY series remain
+- The range API serves lifetime activity on Ethereum, Base, Sonic, and
+  Avalanche. Long-window YPO and aligned TVL/APY series remain
   unavailable until exact boundary intervals exist; they are not synthesized.
 
 ## Repository verification

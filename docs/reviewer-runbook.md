@@ -14,10 +14,14 @@ and traced back to code and PostgreSQL evidence second.
 3. Open the [24-chain USDp supply evidence](https://content-spirit-production-5efa.up.railway.app/api/analytics/usdp-supply).
    Inspect expected/included/missing/stale/failed chain IDs, component block
    hashes/timestamps, bytecode hashes, and metadata proof.
-4. Open the [Base all-time range proof](https://content-spirit-production-5efa.up.railway.app/api/analytics/range?range=all&chains=base&assets=usdp,susdp).
-   This is a deterministic replay from the first registered deployment block,
-   including transfer, mint, burn, holder, deposit, and withdrawal metrics.
-5. Run the automated reviewer proof:
+4. Open the [four-chain all-time range proof](https://content-spirit-production-5efa.up.railway.app/api/analytics/range?range=all&chains=ethereum,base,sonic,avalanche&assets=usdp,susdp).
+   This is a deterministic replay from each registered deployment boundary,
+   including USDp and sUSDp transfer, mint, burn, holder, deposit, and
+   withdrawal metrics.
+5. Open the [five-chain history proof](https://content-spirit-production-5efa.up.railway.app/api/analytics/history).
+   The latest rows share one pinned seven-day UTC window, every chain is
+   reconciled, and the global object contains the exact verified sum.
+6. Run the automated reviewer proof:
 
    ```bash
    npm ci
@@ -36,10 +40,10 @@ derived aggregates:
 - `Published` means both USDp and sUSDp lifetime aggregates are complete; the
   transfer, holder, and vault-flow cells populate on the next 60-second refresh.
 
-Base is the initial published reference row. Ethereum, Sonic, and Avalanche use
-the same schema and require no dashboard change when their backfills finish.
-HyperEVM is shown separately as a verified seven-day history because its public
-log limits make lifetime replay a materially different archive workload.
+Ethereum, Base, Sonic, and Avalanche are published from their complete lifetime
+scopes. HyperEVM is shown separately as a verified fixed seven-day history
+because its public log limits make lifetime replay a materially different
+archive workload.
 
 The visible dashboard does not use the internal word `candidate` as a generic
 quality badge. It names the concrete evidence state instead: finalized onchain,
@@ -54,8 +58,10 @@ key, Railway access, or wallet. It fails non-zero unless:
 - the service identity and health are correct;
 - the latest USDp snapshot has complete 24/24 coverage, no missing/stale/failed
   components, and verified metadata for every deployment;
-- the Base lifetime USDp+sUSDp range is complete and returns exact integer
-  activity metrics;
+- Ethereum, Base, Sonic, and Avalanche lifetime USDp+sUSDp ranges are complete
+  and return exact integer activity, holder, and vault-flow metrics;
+- all five savings chains expose one aligned, independently reconciled
+  seven-day YPO window, including the fixed HyperEVM provenance;
 - the StableWatch v1 payload exposes a renderable global USDp metric and chain
   breakdown.
 
@@ -65,14 +71,14 @@ for another environment.
 
 ## Traceability map
 
-| Claim                        | Evidence path                          | Implementation                      |
-| ---------------------------- | -------------------------------------- | ----------------------------------- |
-| 24-chain current USDp supply | `/api/analytics/usdp-supply`           | `src/analytics/usdp-supply.ts`      |
-| Range activity and holders   | `/api/analytics/range`                 | `src/analytics/range-analytics.ts`  |
-| Native YPO                   | StableWatch projection and history API | `src/analytics/multichain-yield.ts` |
-| Coverage and reconciliation  | verification CLI and DB results        | `src/verification/service.ts`       |
-| StableWatch field mapping    | versioned v1 route                     | `src/integration/stablewatch.ts`    |
-| Database constraints         | Drizzle migrations                     | `drizzle/` and `src/db/schema.ts`   |
+| Claim                        | Evidence path                           | Implementation                      |
+| ---------------------------- | --------------------------------------- | ----------------------------------- |
+| 24-chain current USDp supply | `/api/analytics/usdp-supply`            | `src/analytics/usdp-supply.ts`      |
+| Range activity and holders   | `/api/analytics/range`                  | `src/analytics/range-analytics.ts`  |
+| Native YPO                   | `/api/analytics/history` and projection | `src/analytics/multichain-yield.ts` |
+| Coverage and reconciliation  | verification CLI and DB results         | `src/verification/service.ts`       |
+| StableWatch field mapping    | versioned v1 route                      | `src/integration/stablewatch.ts`    |
+| Database constraints         | Drizzle migrations                      | `drizzle/` and `src/db/schema.ts`   |
 
 ## Status boundaries
 

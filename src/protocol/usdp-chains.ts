@@ -102,28 +102,40 @@ const savingsRpc = (env: RuntimeEnv, chainId: number) => {
   }
 };
 
-const publicRpc = (adapter: UsdpSupplyAdapter) => {
+export const publicSupplyRpcUrls = (adapter: UsdpSupplyAdapter) => {
   // viem's current Ethereum default rejects unauthenticated requests. dRPC is
   // already the project's bounded public Ethereum log source.
-  if (adapter.chain.id === 1) return "https://eth.drpc.org";
+  if (adapter.chain.id === 1) return ["https://eth.drpc.org"];
   const rpcUrl = adapter.chain.rpcUrls.default.http[0];
   if (!rpcUrl)
     throw new Error(`No public RPC registered for chain ${adapter.chain.id}`);
-  return rpcUrl;
+  if (adapter.chain.id === 56)
+    return [
+      ...new Set([
+        rpcUrl,
+        "https://bsc-dataseed.bnbchain.org",
+        "https://bsc-dataseed-public.bnbchain.org",
+      ]),
+    ];
+  return [rpcUrl];
 };
 
 export function configuredUsdpSupplyAdapters(env: RuntimeEnv) {
   return usdpSupplyAdapters.map((adapter) => {
     const explicit = env.USDP_CHAIN_RPC_URLS?.[String(adapter.chain.id)];
     const savings = savingsRpc(env, adapter.chain.id);
+    const publicUrls = publicSupplyRpcUrls(adapter);
+    const rpcUrls = explicit ? [explicit] : savings ? [savings] : publicUrls;
+    const rpcSource = explicit
+      ? ("chain-override" as const)
+      : savings
+        ? ("savings-chain-override" as const)
+        : ("public-default" as const);
     return {
       ...adapter,
-      rpcUrl: explicit ?? savings ?? publicRpc(adapter),
-      rpcSource: explicit
-        ? ("chain-override" as const)
-        : savings
-          ? ("savings-chain-override" as const)
-          : ("public-default" as const),
+      rpcUrl: rpcUrls[0]!,
+      rpcUrls,
+      rpcSource,
     };
   });
 }

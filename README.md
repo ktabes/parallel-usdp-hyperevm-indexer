@@ -4,14 +4,15 @@ An independent, auditable indexer and analytics surface for Parallel V3 USDp and
 
 ## Current status
 
-Current-state adapters are live for all five official sUSDp vault chains. A separate current-supply lane now reads all 24 official USDp deployments with finalized block, bytecode, metadata, timing, and component provenance. Its sum remains a bridge-accounting candidate until peer and message reconciliation promotes it. The historical pipeline supports chain-aware decoding, aligned UTC range planning, resumable log ingestion, boundary snapshots, flows, and candidate YPO for Ethereum, Base, Sonic, HyperEVM, and Avalanche.
+Current-state adapters are live for all five official sUSDp vault chains. A separate current-supply lane reads all 24 official USDp deployments with finalized block, bytecode, metadata, timing, and component provenance. Its sum remains a bridge-accounting candidate until peer and message reconciliation promotes it. The historical pipeline has complete lifetime USDp+sUSDp activity on Ethereum, Base, Sonic, and Avalanche, plus one aligned, independently reconciled seven-day YPO across Ethereum, Base, Sonic, HyperEVM, and Avalanche.
 
 ## Product boundary
 
 - Canonical Parallel V3 USDp and sUSDp asset scope, with per-chain components.
 - USDp deployment coverage target: all 24 chains published by Parallel.
 - sUSDp savings coverage target: Ethereum, Base, Sonic, HyperEVM, and Avalanche.
-- HyperEVM remains the live first adapter while the other chains are added.
+- HyperEVM retains a fixed verified seven-day history; the other four savings
+  chains publish complete lifetime activity.
 - Seven finalized days for the initial historical window.
 - External lending markets are out of the MVP.
 - Borrow, repay, and liquidation metrics are not applicable at the native issuer/savings layer.
@@ -55,6 +56,7 @@ npm run cli -- history-boundaries --days 7
 npm run cli -- history-backfill --chain base --days 7
 npm run cli -- history-backfill --chain ethereum --days 7 --log-rpc-url LOG_RPC_URL
 npm run cli -- history-backfill --chain hyperevm --days 7 --window-end UNIX_TIMESTAMP --log-rpc-url LOG_RPC_URL
+npm run cli -- history-derive --chains ethereum,base,sonic,hyperevm,avalanche --days 7 --window-end UNIX_TIMESTAMP
 npm run worker:hyperevm-history
 npm run cli -- history-reconcile --chains base,sonic,avalanche
 npm run cli -- lifetime-plan --chains ethereum,base,sonic,avalanche
@@ -95,8 +97,9 @@ Network tests are opt-in and require `RUN_NETWORK_TESTS=1` plus a real `HYPEREVM
 
 For a credential-free review of the deployed service, run
 `npm run reviewer:proof`. It verifies public health, complete 24-chain USDp
-supply evidence, Base lifetime USDp+sUSDp analytics, and the versioned
-StableWatch projection. See the [reviewer runbook](docs/reviewer-runbook.md) for
+supply evidence, four-chain lifetime USDp+sUSDp analytics, aligned verified
+five-chain YPO, and the versioned StableWatch projection. See the
+[reviewer runbook](docs/reviewer-runbook.md) for
 the five-minute walkthrough and claim-to-code traceability map.
 
 The official HyperEVM RPC is the default seven-day log source. It limits `eth_getLogs` to 50-block ranges and approximately 100 requests per minute, so the initial week is a long, resumable one-time job rather than a deployment startup task. Ingestion defaults to one request start every 1,500 ms, applies jittered backoff, retries rate limits indefinitely, and commits each successful range before continuing. The optional `ALCHEMY_API_KEY` provides recent-state reads but is not treated as historical. OnFinality remains optional for strict archive certification. Provider roles are assigned from live capability evidence rather than marketing claims.
@@ -139,8 +142,9 @@ uses the savings-chain URLs where configured and public chain defaults for the
 remaining distribution chains. `USDP_CHAIN_RPC_URLS` can override any chain as
 a JSON object keyed by numeric chain ID. `USDP_SUPPLY_ALIGNMENT_MAX_SKEW_SECONDS`
 defaults to `1800`; components outside that block-time window are excluded and
-reported rather than silently added. Public-provider failures degrade only that
-cycle's coverage.
+reported rather than silently added. The BNB adapter has bounded failover
+across multiple BNB Chain-documented public endpoints so one transient public
+node does not unnecessarily reduce an otherwise complete cycle.
 
 Cross-chain historical backfills are never started by web-service deployment. Plan the aligned range first, capture both historical boundaries, and then run one bounded chain backfill. Savings history requests only the sUSDp vault logs needed for Deposit, Withdraw, Accrued, rate, pause, and share-transfer evidence; high-volume USDp token transfers belong to the later standalone USDp distribution/bridge lane. `--log-rpc-url` can assign a separate historical log provider after the configured chain RPC proves the pinned state boundaries. `--window-end` pins the common Unix end timestamp so a later invocation resumes the same scope instead of silently planning a moving seven-day window. The default chain set for planning is Ethereum, Base, Sonic, and Avalanche; add `--chain hyperevm` explicitly when its historical provider budget is available. Candidate chain YPO is stored with exact component provenance but is excluded from a global YPO total until independent rate reconciliation promotes it to verified.
 

@@ -9,6 +9,8 @@ import {
 } from "@/protocol/savings-chains";
 import { createEvmClient, type EvmClient } from "@/rpc/evm-client";
 import { findBlockAtOrAfterTimestamp, ingestLogs } from "@/indexer/service";
+import { verifyCoverage } from "@/indexer/status";
+import { lifetimeActivityScope } from "./lifetime-activity";
 import {
   runWithProviderFailover,
   type RpcProviderCandidate,
@@ -154,6 +156,179 @@ export interface RunSavingsHistoryOptions {
   signal?: AbortSignal;
   onProgress?: Parameters<typeof ingestLogs>[0]["onProgress"];
   onProviderFailover?: (event: RpcProviderFailoverEvent) => void;
+}
+
+export async function reuseSavingsHistoryCoverage(options: {
+  pool: Pool;
+  adapter: SavingsChainAdapter;
+  sourceScope: string;
+  targetScope: string;
+  fromBlock: bigint;
+  toBlock: bigint;
+}) {
+  const sourceCoverage = await verifyCoverage(
+    options.pool,
+    options.sourceScope,
+    options.fromBlock,
+    options.toBlock,
+    options.adapter.chainId,
+  );
+  if (!sourceCoverage.complete)
+    return {
+      status: "unavailable" as const,
+      reason: "source_coverage_incomplete" as const,
+      sourceCoverage,
+    };
+  if (options.sourceScope !== options.targetScope)
+    await options.pool.query(
+      `insert into indexer_coverage
+        (chain_id, scope, from_block, to_block, run_id, scanned_at)
+       select chain_id, $3,
+              greatest(from_block, $4::bigint),
+              least(to_block, $5::bigint),
+              run_id, scanned_at
+         from indexer_coverage
+        where chain_id = $1 and scope = $2
+          and to_block >= $4 and from_block <= $5
+       on conflict (chain_id, scope, from_block, to_block) do nothing`,
+      [
+        options.adapter.chainId,
+        options.sourceScope,
+        options.targetScope,
+        options.fromBlock.toString(),
+        options.toBlock.toString(),
+      ],
+    );
+  const targetCoverage = await verifyCoverage(
+    options.pool,
+    options.targetScope,
+    options.fromBlock,
+    options.toBlock,
+    options.adapter.chainId,
+  );
+  if (!targetCoverage.complete)
+    throw new Error(
+      `${options.adapter.chainName} reused history coverage is incomplete`,
+    );
+  return {
+    status: "complete" as const,
+    sourceScope: options.sourceScope,
+    targetScope: options.targetScope,
+    provenance: "original coverage run IDs and scan timestamps preserved",
+    sourceCoverage,
+    targetCoverage,
+  };
+}
+
+export async function deriveSavingsHistoryFromCompleteCoverage(options: {
+  pool: Pool;
+  env: RuntimeEnv;
+  range: AlignedSavingsHistoryRange;
+  sourceScope?: string;
+}) {
+  const { adapter } = options.range;
+  const targetScope = savingsHistoryScope(options.range);
+  const sourceScope =
+    options.sourceScope ??
+    (adapter.chainId === 999 ? targetScope : lifetimeActivityScope(adapter));
+  const lock = await options.pool.connect();
+  const lockResult = await lock.query<{ locked: boolean }>(
+    `select pg_try_advisory_lock($1, hashtext($2)) as locked`,
+    [adapter.chainId, targetScope],
+  );
+  if (!lockResult.rows[0]?.locked) {
+    lock.release();
+    throw new Error(`${adapter.chainName} history worker is already running`);
+  }
+  try {
+    const startSnapshot = await captureSavingsChainSnapshot({
+      pool: options.pool,
+      adapter,
+      rpcUrl: options.range.rpcUrl,
+      finalityLag: options.env.FINALITY_LAG,
+      requestIntervalMs: options.env.RPC_REQUEST_INTERVAL_MS,
+      blockNumber: options.range.fromBlock,
+    });
+    const endSnapshot = await captureSavingsChainSnapshot({
+      pool: options.pool,
+      adapter,
+      rpcUrl: options.range.rpcUrl,
+      finalityLag: options.env.FINALITY_LAG,
+      requestIntervalMs: options.env.RPC_REQUEST_INTERVAL_MS,
+      blockNumber: options.range.toBlock,
+    });
+    if (startSnapshot.status === "invalid" || endSnapshot.status === "invalid")
+      return {
+        status: "unavailable" as const,
+        reason: "boundary_snapshot_invalid" as const,
+        chainId: adapter.chainId,
+        chainSlug: adapter.chainSlug,
+        targetScope,
+        startSnapshot,
+        endSnapshot,
+      };
+    const coverage = await reuseSavingsHistoryCoverage({
+      pool: options.pool,
+      adapter,
+      sourceScope,
+      targetScope,
+      fromBlock: options.range.fromBlock,
+      toBlock: options.range.toBlock,
+    });
+    if (coverage.status !== "complete")
+      return {
+        status: "unavailable" as const,
+        reason: coverage.reason,
+        chainId: adapter.chainId,
+        chainSlug: adapter.chainSlug,
+        targetScope,
+        coverage,
+      };
+    const flows = await rebuildFlowAnalytics({
+      pool: options.pool,
+      chainId: adapter.chainId,
+      scope: targetScope,
+      fromBlock: options.range.fromBlock,
+      toBlock: options.range.toBlock,
+      manifestVersion: adapter.manifestVersion,
+    });
+    const yieldResult = await calculateSavingsYieldForRange({
+      pool: options.pool,
+      adapter,
+      scope: targetScope,
+      fromBlock: options.range.fromBlock,
+      toBlock: options.range.toBlock,
+    });
+    return {
+      status:
+        flows.status === "candidate" && yieldResult.status === "candidate"
+          ? ("candidate" as const)
+          : ("unavailable" as const),
+      chainId: adapter.chainId,
+      chainSlug: adapter.chainSlug,
+      sourceScope,
+      targetScope,
+      range: {
+        fromBlock: options.range.fromBlock.toString(),
+        toBlock: options.range.toBlock.toString(),
+        fromTimestamp: options.range.fromTimestamp.toString(),
+        toTimestamp: options.range.toTimestamp.toString(),
+        targetWindowStart: options.range.targetWindowStart.toString(),
+        targetWindowEnd: options.range.targetWindowEnd.toString(),
+      },
+      startSnapshot,
+      endSnapshot,
+      coverage,
+      flows,
+      yield: yieldResult,
+    };
+  } finally {
+    await lock.query(`select pg_advisory_unlock($1, hashtext($2))`, [
+      adapter.chainId,
+      targetScope,
+    ]);
+    lock.release();
+  }
 }
 
 export async function runSavingsHistoryRange(

@@ -9,16 +9,18 @@ The implementation captures finalized contract state and logs, stores durable
 block-level provenance in PostgreSQL, derives native flows and Yield Paid Out,
 and gates every aggregate on coverage and reconciliation. Missing history is
 returned as typed unavailable data instead of being estimated or silently
-zeroed. The public inspection page makes the current five-chain state,
-per-chain history, calculation versions, freshness, and remaining coverage
-visible to a reviewer.
+zeroed. The finished dataset includes complete lifetime USDp and sUSDp activity
+on Ethereum, Base, Sonic, and Avalanche, plus one aligned, independently
+reconciled seven-day YPO across all five sUSDp chains. The public inspection
+page makes the exact coverage and calculation versions visible to a reviewer.
 
 For integration, I added a versioned StableWatch-oriented API contract that
 maps the evidence into a market row and asset detail while preserving exact
 integer precision, source attribution, availability, and verification status.
 The codebase includes tests, an OpenAPI handoff, methodology and schema notes,
-resumable backfills, Railway deployment support, and a documented path to
-verified 24-chain USDp supply and LayerZero bridge accounting.
+resumable backfills, Railway deployment support, a credential-free public proof
+command, and a documented path from complete 24-chain contract supply to
+verified LayerZero bridge accounting.
 
 Live service: <https://content-spirit-production-5efa.up.railway.app>
 

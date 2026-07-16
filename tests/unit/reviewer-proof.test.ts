@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  verifyBaseLifetimeRange,
   verifyGlobalUsdpSupply,
   verifyHealth,
+  verifyLifetimeRange,
+  verifySavingsHistory,
   verifyStablewatchProjection,
 } from "../../scripts/reviewer-proof";
 
@@ -51,39 +52,72 @@ describe("reviewer proof validators", () => {
     );
   });
 
-  it("accepts complete Base lifetime analytics for both assets", () => {
+  it("accepts complete four-chain lifetime analytics for both assets", () => {
+    const chain = (chainId: number) => ({
+      chainId,
+      chainSlug: `chain-${chainId}`,
+      assets: {
+        usdp: {
+          status: "available",
+          coverage: { historyComplete: true },
+          currentHoldersAtCoverageEnd: 29,
+          activity: { transferVolume: "100", transferCount: 2 },
+        },
+        susdp: {
+          status: "available",
+          coverage: { historyComplete: true },
+          currentHoldersAtCoverageEnd: 6,
+          activity: { transferVolume: "50", transferCount: 1 },
+        },
+      },
+      savings: {
+        flows: {
+          depositedAssets: "20",
+          withdrawnAssets: "10",
+          depositCount: 2,
+          withdrawCount: 1,
+        },
+      },
+    });
     expect(
-      verifyBaseLifetimeRange({
+      verifyLifetimeRange({
         status: "complete",
         range: "all",
-        coverage: { availableComponents: 2, missingComponents: 0 },
-        chains: [
-          {
-            chainId: 8453,
-            assets: {
-              usdp: {
-                status: "available",
-                currentHoldersAtCoverageEnd: 486,
-                activity: {
-                  transferVolume: "26878931865830441382036182",
-                  transferCount: 129550,
-                  uniqueParticipants: 937,
-                  newHolders: 936,
-                },
-              },
-              susdp: {
-                status: "available",
-                currentHoldersAtCoverageEnd: 12,
-                activity: {
-                  transferVolume: "53728306915538115636",
-                  transferCount: 11,
-                },
-              },
-            },
-          },
-        ],
+        coverage: { availableComponents: 8, missingComponents: 0 },
+        chains: [1, 8453, 146, 43114].map(chain),
       }),
-    ).toMatchObject({ id: "base-lifetime-analytics", status: "pass" });
+    ).toMatchObject({ id: "four-chain-lifetime-analytics", status: "pass" });
+  });
+
+  it("accepts verified aligned five-chain YPO with fixed HyperEVM provenance", () => {
+    const chains = [1, 8453, 146, 999, 43114].map((chainId) => ({
+      chainId,
+      chainSlug: `chain-${chainId}`,
+      fromBlock: chainId === 999 ? "39958147" : "1",
+      toBlock: chainId === 999 ? "40572940" : "2",
+      coverageScope:
+        chainId === 999
+          ? "parallel-savings-hyperevm-1783558757-1784163557-v1"
+          : `scope-${chainId}`,
+      nativeYpo: "1",
+      reconciliationStatus: "verified",
+    }));
+    expect(
+      verifySavingsHistory({
+        status: "complete",
+        chains,
+        global: {
+          coverageStatus: "complete",
+          expectedChainCount: 5,
+          includedChainCount: 5,
+          missingChainIds: [],
+          unreconciledChainIds: [],
+          nativeYpo: "5",
+          windowStart: "2026-07-09T00:59:17.000Z",
+          windowEnd: "2026-07-16T00:59:17.000Z",
+        },
+      }),
+    ).toMatchObject({ id: "five-chain-aligned-ypo", status: "pass" });
   });
 
   it("accepts a renderable versioned StableWatch projection", () => {

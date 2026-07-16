@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   aggregateUsdpSupplyComponents,
   isBlockTimestampOutsideAlignment,
+  runWithSupplyRpcFailover,
   type UsdpSupplyComponent,
 } from "@/analytics/usdp-supply";
-import { usdpSupplyAdapters } from "@/protocol/usdp-chains";
+import {
+  publicSupplyRpcUrls,
+  usdpSupplyAdapters,
+} from "@/protocol/usdp-chains";
 
 const asOf = new Date("2026-07-16T12:00:00.000Z");
 
@@ -98,5 +102,32 @@ describe("USDp supply adapter registry", () => {
     expect(
       new Set(usdpSupplyAdapters.map((adapter) => adapter.chain.id)).size,
     ).toBe(24);
+  });
+
+  it("keeps multiple official public BNB endpoints available", () => {
+    const bnb = usdpSupplyAdapters.find((adapter) => adapter.chain.id === 56)!;
+    expect(publicSupplyRpcUrls(bnb)).toEqual(
+      expect.arrayContaining([
+        "https://bsc-dataseed.bnbchain.org",
+        "https://bsc-dataseed-public.bnbchain.org",
+      ]),
+    );
+  });
+});
+
+describe("USDp supply RPC failover", () => {
+  it("uses the next candidate after a transient provider failure", async () => {
+    const attempted: string[] = [];
+    await expect(
+      runWithSupplyRpcFailover({
+        rpcUrls: ["primary", "fallback"],
+        operation: async (rpcUrl) => {
+          attempted.push(rpcUrl);
+          if (rpcUrl === "primary") throw new Error("temporarily unavailable");
+          return "snapshot";
+        },
+      }),
+    ).resolves.toBe("snapshot");
+    expect(attempted).toEqual(["primary", "fallback"]);
   });
 });

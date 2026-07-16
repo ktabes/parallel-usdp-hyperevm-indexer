@@ -23,10 +23,12 @@ import {
   syncParallelAssetRegistry,
 } from "@/analytics/multichain-snapshots";
 import {
+  deriveSavingsHistoryFromCompleteCoverage,
   resolveAlignedSavingsHistoryRanges,
   runSavingsHistoryRange,
 } from "@/analytics/savings-history";
 import { reconcileLatestSavingsYield } from "@/analytics/yield-reconciliation";
+import { createGlobalSavingsYield } from "@/analytics/multichain-yield";
 import {
   capLifetimeActivityRange,
   lifetimeActivityRequestCount,
@@ -541,6 +543,108 @@ async function backfillSavingsHistory() {
   }
 }
 
+async function deriveAlignedSavingsHistory() {
+  const env = parseRuntimeEnv(process.env);
+  const requestedChains = requestedHistoryChains();
+  const expectedSlugs = savingsChainAdapters.map(
+    (adapter) => adapter.chainSlug,
+  );
+  if (
+    requestedChains.length !== expectedSlugs.length ||
+    !expectedSlugs.every((slug) => requestedChains.includes(slug))
+  )
+    throw new Error(
+      `Aligned global YPO requires all ${savingsChainAdapters.length} savings chains`,
+    );
+  const pinnedWindowEnd = historyWindowEnd();
+  if (pinnedWindowEnd === undefined)
+    throw new Error(
+      "history-derive requires --window-end so existing HyperEVM proof remains fixed",
+    );
+  const targetWindowStart =
+    pinnedWindowEnd - BigInt(historyDays()) * 24n * 60n * 60n;
+  const hyperScope = `parallel-savings-hyperevm-${targetWindowStart}-${pinnedWindowEnd}-v1`;
+  const ranges = await resolveAlignedSavingsHistoryRanges(
+    env,
+    requestedChains.filter((slug) => slug !== "hyperevm"),
+    historyDays(),
+    pinnedWindowEnd,
+  );
+  const { pool } = createDatabase(env);
+  try {
+    await syncParallelAssetRegistry(pool);
+    const existingHyper = await pool.query<{
+      id: string;
+      reconciliation_status: string;
+      native_ypo: string;
+    }>(
+      `select id, reconciliation_status, native_ypo
+         from savings_yield_aggregates
+        where chain_id = 999 and coverage_scope = $1
+        order by created_at desc limit 1`,
+      [hyperScope],
+    );
+    if (
+      !existingHyper.rows[0] ||
+      existingHyper.rows[0].reconciliation_status !== "verified"
+    )
+      throw new Error(
+        "Existing fixed HyperEVM interval is missing or unverified; run the archive-backed history lane first",
+      );
+    const derived = [];
+    for (const range of ranges) {
+      const result = await deriveSavingsHistoryFromCompleteCoverage({
+        pool,
+        env,
+        range,
+      });
+      derived.push(result);
+      if (result.status !== "candidate")
+        throw new Error(
+          `${range.adapter.chainName} aligned history derivation is unavailable`,
+        );
+    }
+    const reconciliations = [];
+    for (const adapter of savingsChainAdapters) {
+      const reconciliation = await reconcileLatestSavingsYield(pool, adapter);
+      reconciliations.push(reconciliation);
+      if (reconciliation.status !== "verified")
+        throw new Error(
+          `${adapter.chainName} aligned YPO reconciliation did not verify`,
+        );
+    }
+    const global = await createGlobalSavingsYield(
+      pool,
+      new Date(Number(targetWindowStart) * 1_000),
+      new Date(Number(pinnedWindowEnd) * 1_000),
+    );
+    if (global.status !== "complete")
+      throw new Error("Aligned global YPO did not include all five chains");
+    console.log(
+      JSON.stringify(
+        {
+          status: "complete",
+          targetWindowStart: targetWindowStart.toString(),
+          targetWindowEnd: pinnedWindowEnd.toString(),
+          existingHyperEvm: {
+            coverageScope: hyperScope,
+            savingsYieldId: existingHyper.rows[0].id,
+            nativeYpo: existingHyper.rows[0].native_ypo,
+            reconciliationStatus: existingHyper.rows[0].reconciliation_status,
+          },
+          derived,
+          reconciliations,
+          global,
+        },
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await pool.end();
+  }
+}
+
 function optionalChunkSize() {
   const value = argument("--chunk-size");
   if (value === undefined) return undefined;
@@ -904,6 +1008,9 @@ async function main() {
     case "history-backfill":
       await backfillSavingsHistory();
       return;
+    case "history-derive":
+      await deriveAlignedSavingsHistory();
+      return;
     case "history-reconcile":
       await reconcileSavingsHistory();
       return;
@@ -936,7 +1043,7 @@ async function main() {
       return;
     default:
       throw new Error(
-        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|verify|holders-replay|derive-flows|snapshot|snapshot-all|snapshot-usdp|history-plan|history-boundaries|history-backfill|history-reconcile|lifetime-plan|lifetime-backfill|calculate-yield|state|yield|rates|price|global|global-usdp|range|history>",
+        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|verify|holders-replay|derive-flows|snapshot|snapshot-all|snapshot-usdp|history-plan|history-boundaries|history-backfill|history-derive|history-reconcile|lifetime-plan|lifetime-backfill|calculate-yield|state|yield|rates|price|global|global-usdp|range|history>",
       );
   }
 }

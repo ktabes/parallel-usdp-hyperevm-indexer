@@ -534,27 +534,51 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
+export async function runWithSupplyRpcFailover<T>(options: {
+  rpcUrls: readonly string[];
+  operation: (rpcUrl: string) => Promise<T>;
+}) {
+  if (options.rpcUrls.length === 0)
+    throw new Error("USDp supply RPC candidate list is empty");
+  let lastError: unknown;
+  for (const rpcUrl of options.rpcUrls) {
+    try {
+      return await options.operation(rpcUrl);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw new Error(
+    `All ${options.rpcUrls.length} USDp supply RPC candidates failed: ${providerErrorMessage(lastError)}`,
+    { cause: lastError },
+  );
+}
+
 export async function captureGlobalUsdpSupply(pool: Pool, env: RuntimeEnv) {
   await syncParallelAssetRegistry(pool);
   const asOf = new Date();
   const adapters = configuredUsdpSupplyAdapters(env);
   const secretUrls = adapters
     .filter((adapter) => adapter.rpcSource !== "public-default")
-    .map((adapter) => adapter.rpcUrl);
+    .flatMap((adapter) => adapter.rpcUrls);
   const attempts = await mapWithConcurrency(adapters, 6, async (adapter) => {
     try {
       return {
         ok: true as const,
-        component: await captureUsdpSupplyComponent({
-          pool,
-          adapter,
-          rpcUrl: adapter.rpcUrl,
-          rpcSource: adapter.rpcSource,
-          finalityLag: env.FINALITY_LAG,
-          observedAt: asOf,
-          alignmentMaximumSkewSeconds:
-            env.USDP_SUPPLY_ALIGNMENT_MAX_SKEW_SECONDS,
-          requestIntervalMs: env.RPC_REQUEST_INTERVAL_MS,
+        component: await runWithSupplyRpcFailover({
+          rpcUrls: adapter.rpcUrls,
+          operation: (rpcUrl) =>
+            captureUsdpSupplyComponent({
+              pool,
+              adapter,
+              rpcUrl,
+              rpcSource: adapter.rpcSource,
+              finalityLag: env.FINALITY_LAG,
+              observedAt: asOf,
+              alignmentMaximumSkewSeconds:
+                env.USDP_SUPPLY_ALIGNMENT_MAX_SKEW_SECONDS,
+              requestIntervalMs: env.RPC_REQUEST_INTERVAL_MS,
+            }),
         }),
       };
     } catch (error) {
