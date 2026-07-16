@@ -150,4 +150,28 @@ describe("StableWatch-compatible asset payload", () => {
       "source_snapshot_stale",
     );
   });
+
+  it("publishes all-time YPO only from four verified lifetime ranges", () => {
+    const payload = buildStablewatchAssetPayload({
+      ...baseInput,
+      lifetime: [1, 8453, 146, 43114].map((chainId, index) => ({
+        chainId,
+        chainSlug: ["ethereum", "base", "sonic", "avalanche"][index]!,
+        chainName: ["Ethereum", "Base", "Sonic", "Avalanche"][index]!,
+        lifetimeYield: {
+          windowStart: "2025-06-30T00:00:00.000Z",
+          windowEnd: "2026-07-16T00:00:00.000Z",
+          nativeYpo: "1000000000000000000",
+          reconciliationStatus: "verified" as const,
+        },
+      })),
+    });
+
+    expect(payload.marketRow.ypoAllTime).toMatchObject({
+      availability: "available",
+      verification: "verified",
+      value: "4000000000000000000",
+    });
+    expect(payload.detail.charts.ypoAllTime.excludedChainIds).toEqual([999]);
+  });
 });

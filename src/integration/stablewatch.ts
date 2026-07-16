@@ -138,6 +138,17 @@ export interface StablewatchPayloadInput {
   global: GlobalSavingsInput;
   globalUsdp?: GlobalUsdpSupplyInput;
   history: HistoryInput;
+  lifetime?: Array<{
+    chainId: number;
+    chainSlug: string;
+    chainName: string;
+    lifetimeYield: {
+      windowStart: string;
+      windowEnd: string;
+      nativeYpo: string;
+      reconciliationStatus: "verified";
+    } | null;
+  }>;
   prices: PricesInput;
   generatedAt?: string;
 }
@@ -190,6 +201,7 @@ export function buildStablewatchAssetPayload({
   global,
   globalUsdp,
   history,
+  lifetime = [],
   prices,
   generatedAt = new Date().toISOString(),
 }: StablewatchPayloadInput) {
@@ -283,6 +295,39 @@ export function buildStablewatchAssetPayload({
         "usdp_base_units",
         "aligned_five_chain_reconciled_window_pending",
       );
+  const verifiedLifetimeYieldComponents = lifetime.flatMap((chain) =>
+    chain.lifetimeYield?.reconciliationStatus === "verified"
+      ? [
+          {
+            chainId: chain.chainId,
+            chainSlug: chain.chainSlug,
+            chainName: chain.chainName,
+            windowStart: chain.lifetimeYield.windowStart,
+            windowEnd: chain.lifetimeYield.windowEnd,
+            nativeYpo: chain.lifetimeYield.nativeYpo,
+          },
+        ]
+      : [],
+  );
+  const allTimeYpoValue = verifiedLifetimeYieldComponents
+    .reduce((total, chain) => total + BigInt(chain.nativeYpo), 0n)
+    .toString();
+  const ypoAllTime =
+    verifiedLifetimeYieldComponents.length === 4
+      ? availableMetric(allTimeYpoValue, "usdp_base_units", {
+          verification: "verified",
+          asOf: verifiedLifetimeYieldComponents
+            .map((chain) => chain.windowEnd)
+            .sort()
+            .at(-1),
+          calculationVersion: "parallel-indexed-lifetime-savings-native-ypo-v1",
+          attribution:
+            "Sum of verified sUSDp deployment-to-fixed-endpoint YPO on Ethereum, Base, Sonic, and Avalanche; HyperEVM excluded",
+        })
+      : unavailableMetric(
+          "usdp_base_units",
+          "four_chain_lifetime_history_or_reconciliation_pending",
+        );
 
   const historyByChain = new Map(
     (history.chains ?? []).map((chain) => [chain.chainId, chain]),
@@ -364,10 +409,7 @@ export function buildStablewatchAssetPayload({
         "usdp_base_units",
         "ninety_day_history_not_backfilled",
       ),
-      ypoAllTime: unavailableMetric(
-        "usdp_base_units",
-        "lifetime_history_not_backfilled",
-      ),
+      ypoAllTime,
     },
     detail: {
       headline: {
@@ -381,6 +423,7 @@ export function buildStablewatchAssetPayload({
           : susdpPriceMetric,
         estimatedApy,
         ypoSevenDay,
+        ypoAllTime,
       },
       usdpSupply: {
         onSavingsChains: global.usdp?.supplyOnSavingsChains
@@ -503,6 +546,18 @@ export function buildStablewatchAssetPayload({
             nativeYpo: chain.nativeYpo,
             reconciliationStatus: chain.reconciliationStatus,
           })),
+        },
+        ypoAllTime: {
+          status:
+            verifiedLifetimeYieldComponents.length === 4
+              ? "available"
+              : "partial",
+          reason:
+            verifiedLifetimeYieldComponents.length === 4
+              ? null
+              : "four_chain_lifetime_history_or_reconciliation_pending",
+          components: verifiedLifetimeYieldComponents,
+          excludedChainIds: [999],
         },
       },
     },

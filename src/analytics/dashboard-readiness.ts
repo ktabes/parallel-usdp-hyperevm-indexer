@@ -71,6 +71,18 @@ export interface LifetimeFlowMetric {
   withdrawCount: number;
 }
 
+export interface LifetimeYieldMetric {
+  fromBlock: string;
+  toBlock: string;
+  windowStart: string;
+  windowEnd: string;
+  nativeYpo: string;
+  accruedInterest: string;
+  pendingYieldAtStart: string;
+  pendingYieldAtEnd: string;
+  reconciliationStatus: "verified";
+}
+
 export interface LifetimeDashboardRow {
   chainId: number;
   chainSlug: string;
@@ -87,6 +99,7 @@ export interface LifetimeDashboardRow {
   publishedAssets: number;
   assets: Partial<Record<"usdp" | "susdp", LifetimeActivityMetric>>;
   flows: LifetimeFlowMetric | null;
+  lifetimeYield: LifetimeYieldMetric | null;
 }
 
 interface CheckpointRow {
@@ -123,6 +136,26 @@ interface FlowRow {
   withdraw_count: string;
 }
 
+interface LifetimeYieldRow {
+  chain_id: number;
+  from_block: string;
+  to_block: string;
+  window_start: Date;
+  window_end: Date;
+  native_ypo: string;
+  accrued_interest: string;
+  pending_yield_at_start: string;
+  pending_yield_at_end: string;
+  reconciliation_status: "verified";
+}
+
+const savingsDeploymentBlocks = new Map<number, bigint>([
+  [1, 22_816_779n],
+  [8453, 32_247_463n],
+  [146, 36_579_532n],
+  [43114, 68_411_905n],
+]);
+
 export function lifetimeProgressPercent(
   fromBlock: bigint,
   goalBlock: bigint,
@@ -156,7 +189,7 @@ export function lifetimePublicationStatus(options: {
 export async function readLifetimeDashboard(pool: Pool) {
   const scopes = lifetimeDashboardRanges.map((range) => range.scope);
   const chainIds = lifetimeDashboardRanges.map((range) => range.chainId);
-  const [checkpoints, activity, flows] = await Promise.all([
+  const [checkpoints, activity, flows, lifetimeYields] = await Promise.all([
     pool.query<CheckpointRow>(
       `select chain_id, scope, next_block, updated_at
          from indexer_checkpoints
@@ -191,6 +224,17 @@ export async function readLifetimeDashboard(pool: Pool) {
          from flow_aggregates
         where chain_id = any($1::int[]) and granularity = 'day'
         group by chain_id, source_from_block, source_to_block`,
+      [chainIds],
+    ),
+    pool.query<LifetimeYieldRow>(
+      `select chain_id, from_block::text, to_block::text,
+              window_start, window_end, native_ypo, accrued_interest,
+              pending_yield_at_start, pending_yield_at_end,
+              reconciliation_status
+         from savings_yield_aggregates
+        where chain_id = any($1::int[])
+          and reconciliation_status = 'verified'
+        order by chain_id, created_at desc`,
       [chainIds],
     ),
   ]);
@@ -232,6 +276,14 @@ export async function readLifetimeDashboard(pool: Pool) {
         BigInt(row.source_to_block) === range.goalBlock,
     );
     const nextBlock = checkpoint ? BigInt(checkpoint.next_block) : null;
+    const expectedYieldStart = savingsDeploymentBlocks.get(range.chainId);
+    const lifetimeYield = lifetimeYields.rows.find(
+      (row) =>
+        row.chain_id === range.chainId &&
+        expectedYieldStart !== undefined &&
+        BigInt(row.from_block) === expectedYieldStart &&
+        BigInt(row.to_block) === range.goalBlock,
+    );
     return {
       chainId: range.chainId,
       chainSlug: range.chainSlug,
@@ -261,6 +313,19 @@ export async function readLifetimeDashboard(pool: Pool) {
             withdrawnAssets: flow.withdrawn_assets,
             depositCount: Number(flow.deposit_count),
             withdrawCount: Number(flow.withdraw_count),
+          }
+        : null,
+      lifetimeYield: lifetimeYield
+        ? {
+            fromBlock: lifetimeYield.from_block,
+            toBlock: lifetimeYield.to_block,
+            windowStart: lifetimeYield.window_start.toISOString(),
+            windowEnd: lifetimeYield.window_end.toISOString(),
+            nativeYpo: lifetimeYield.native_ypo,
+            accruedInterest: lifetimeYield.accrued_interest,
+            pendingYieldAtStart: lifetimeYield.pending_yield_at_start,
+            pendingYieldAtEnd: lifetimeYield.pending_yield_at_end,
+            reconciliationStatus: lifetimeYield.reconciliation_status,
           }
         : null,
     };

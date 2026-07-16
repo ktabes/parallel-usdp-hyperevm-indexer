@@ -69,6 +69,7 @@ async function loadChainDetail(chainSlug: string) {
       global,
       globalUsdp,
       history,
+      lifetime: lifetimeRows,
       prices,
     });
     const current = payload.detail.chainBreakdown.find(
@@ -156,6 +157,14 @@ export default async function ChainDetailPage({
           <article>
             <small>7-day YPO</small>
             <strong>{decimal(current.ypoSevenDay.value, 4)} USDp</strong>
+          </article>
+          <article>
+            <small>Indexed all-time YPO</small>
+            <strong>
+              {lifetime?.lifetimeYield
+                ? `${decimal(lifetime.lifetimeYield.nativeYpo, 4)} USDp`
+                : "Not indexed"}
+            </strong>
           </article>
           <article>
             <small>Current block</small>
@@ -248,6 +257,26 @@ export default async function ChainDetailPage({
                 </article>
               </div>
             </section>
+
+            {lifetime.lifetimeYield ? (
+              <section className="chain-detail-section">
+                <div className="chain-detail-heading">
+                  <div>
+                    <p className="eyebrow">Yield Paid Out</p>
+                    <h2>
+                      {decimal(lifetime.lifetimeYield.nativeYpo, 4)} USDp since
+                      sUSDp deployment
+                    </h2>
+                  </div>
+                  <p>
+                    Verified from {date(lifetime.lifetimeYield.windowStart)} to{" "}
+                    {date(lifetime.lifetimeYield.windowEnd)} using complete
+                    Accrued events plus the change in pending yield at exact
+                    boundary blocks.
+                  </p>
+                </div>
+              </section>
+            ) : null}
 
             <section className="chain-detail-section">
               <div className="chain-detail-heading">

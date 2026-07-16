@@ -217,6 +217,7 @@ async function dashboardData() {
         global,
         globalUsdp,
         history,
+        lifetime,
         prices,
       }),
       globalUsdp,
@@ -285,6 +286,12 @@ export default async function Home() {
     (total, chain) => total + (chain.assets.susdp?.activeHolders ?? 0),
     0,
   );
+  const lifetimeYieldRows = publishedLifetimeChains.filter(
+    (chain) => chain.lifetimeYield !== null,
+  );
+  const indexedAllTimeYpo = sum(
+    lifetimeYieldRows.map((chain) => chain.lifetimeYield?.nativeYpo),
+  );
   const hyperevmHistory = data.detail.chainBreakdown.find(
     (chain) => chain.chainSlug === "hyperevm",
   );
@@ -329,7 +336,7 @@ export default async function Home() {
             <span aria-hidden="true">⌁</span> Chains
           </a>
           <a href="#activity">
-            <span aria-hidden="true">↻</span> Lifetime activity
+            <span aria-hidden="true">↻</span> Activity
           </a>
           <a href="#yield">
             <span aria-hidden="true">%</span> Yield
@@ -437,14 +444,6 @@ export default async function Home() {
           </article>
           <article className="metric-card">
             <div className="metric-card-head">
-              <p>Estimated APY</p>
-              <span className="metric-glyph">%</span>
-            </div>
-            <strong>{percentage(headline.estimatedApy.value)}</strong>
-            <small>Current TVL-weighted savings rate</small>
-          </article>
-          <article className="metric-card">
-            <div className="metric-card-head">
               <p>7-day Yield Paid Out</p>
               <span className="metric-glyph">↗</span>
             </div>
@@ -454,6 +453,16 @@ export default async function Home() {
                 : `${verifiedHistory}/5 chains`}
             </strong>
             <small>Yield paid to sUSDp holders over the last 7 days</small>
+          </article>
+          <article className="metric-card">
+            <div className="metric-card-head">
+              <p>Indexed all-time YPO</p>
+              <span className="metric-glyph">∞</span>
+            </div>
+            <strong>{decimal(indexedAllTimeYpo.toString(), 18, 2)} USDp</strong>
+            <small>
+              Verified deployment histories on {lifetimeYieldRows.length} chains
+            </small>
           </article>
           <article className="metric-card">
             <div className="metric-card-head">
@@ -900,8 +909,25 @@ export default async function Home() {
                 <p className="eyebrow">Yield Paid Out</p>
                 <h2>Native yield, not incentives</h2>
               </div>
-              <span className="window-pill">7 days</span>
+              <span className="window-pill">7 days + indexed all-time</span>
             </div>
+            <div className="yield-period-summary">
+              <div>
+                <small>Last 7 days · 5 chains</small>
+                <strong>
+                  {headline.ypoSevenDay.value
+                    ? `${decimal(headline.ypoSevenDay.value, 18, 4)} USDp`
+                    : "—"}
+                </strong>
+              </div>
+              <div>
+                <small>Indexed all-time · 4 chains</small>
+                <strong>
+                  {decimal(indexedAllTimeYpo.toString(), 18, 4)} USDp
+                </strong>
+              </div>
+            </div>
+            <h3 className="yield-chart-title">Last 7 days</h3>
             <div className="yield-chart" aria-label="Verified YPO by chain">
               {(data.detail.charts.ypo.components ?? []).map((point) => {
                 const maximum = Math.max(
@@ -933,6 +959,46 @@ export default async function Home() {
                     </div>
                     <strong>{decimal(point.nativeYpo, 18, 3)}</strong>
                   </div>
+                );
+              })}
+            </div>
+            <h3 className="yield-chart-title">Indexed all-time by chain</h3>
+            <div
+              className="yield-chart lifetime-yield-chart"
+              aria-label="Verified indexed all-time YPO by chain"
+            >
+              {lifetimeYieldRows.map((chain) => {
+                const maximum = Math.max(
+                  ...lifetimeYieldRows.map(
+                    (item) => Number(item.lifetimeYield?.nativeYpo ?? 0) / 1e18,
+                  ),
+                  1,
+                );
+                const value = Number(chain.lifetimeYield!.nativeYpo) / 1e18;
+                return (
+                  <a
+                    className="yield-row"
+                    key={chain.chainId}
+                    href={`/chains/${chain.chainSlug}`}
+                  >
+                    <span>
+                      <ChainLogo
+                        slug={chain.chainSlug}
+                        name={chain.chainName}
+                      />
+                      {chain.chainName}
+                    </span>
+                    <div>
+                      <i
+                        style={{
+                          width: `${Math.max((value / maximum) * 100, value ? 1 : 0)}%`,
+                        }}
+                      />
+                    </div>
+                    <strong>
+                      {decimal(chain.lifetimeYield!.nativeYpo, 18, 3)}
+                    </strong>
+                  </a>
                 );
               })}
             </div>
@@ -968,8 +1034,10 @@ export default async function Home() {
               ))}
             </div>
             <p className="coverage-note">
-              Global YPO is published only after all component windows are
-              aligned and independently reconciled.
+              Seven-day YPO uses aligned windows across all five chains. Indexed
+              all-time YPO covers Ethereum, Base, Sonic, and Avalanche from each
+              sUSDp deployment through the fixed indexed endpoint; HyperEVM is
+              not included in that all-time total.
             </p>
           </aside>
         </section>
@@ -977,8 +1045,8 @@ export default async function Home() {
         <section className="panel trust-panel" id="methodology">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Engineering trust layer</p>
-              <h2>Every number carries its evidence</h2>
+              <p className="eyebrow">Methodology</p>
+              <h2>Where every number comes from</h2>
             </div>
             <p>
               Designed as an integration-ready dataset with stronger provenance
@@ -1024,7 +1092,7 @@ export default async function Home() {
               <span>Metric family</span>
               <span>Source and method</span>
               <span>Time coverage</span>
-              <span>Reviewer-facing state</span>
+              <span>Evidence</span>
             </div>
             <div>
               <strong>Current USDp + sUSDp state</strong>
@@ -1061,15 +1129,46 @@ export default async function Home() {
               <span className="method-state reconciled">Reconciled</span>
             </div>
             <div>
+              <strong>sUSDp TVL, share value, and APY</strong>
+              <p>
+                TVL is vault totalAssets() in USDp. Share value is totalAssets
+                divided by totalSupply; estimated APY annualizes the current
+                onchain savings rate and is not a realized return.
+              </p>
+              <code>5 finalized vault states</code>
+              <span className="method-state onchain">Contract arithmetic</span>
+            </div>
+            <div>
+              <strong>Indexed all-time Yield Paid Out</strong>
+              <p>
+                The same canonical YPO formula applied from each sUSDp
+                deployment block through its fixed lifetime endpoint. Event
+                coverage and boundary vault state are independently checked.
+              </p>
+              <code>{lifetimeYieldRows.length}/4 ranges verified</code>
+              <span className="method-state reconciled">HyperEVM excluded</span>
+            </div>
+            <div>
               <strong>Lifetime holders and activity</strong>
               <p>
-                Immutable Transfer, Deposit, and Withdraw logs replayed from
-                verified deployment blocks with zero-address exclusions.
+                Activity counts ordinary ERC-20 transfers between nonzero
+                addresses. Mint and burn events are separate; transfers are not
+                inferred to be buys or sells.
               </p>
               <code>
                 {publishedLifetimeChains.length}/4 histories published
               </code>
               <span className="method-state automatic">Auto-publishes</span>
+            </div>
+            <div>
+              <strong>Holder lists</strong>
+              <p>
+                Current balances are replayed from complete Transfer history.
+                The zero address is excluded; contracts and externally owned
+                accounts are both retained.
+              </p>
+              <code>Chain-specific drill-downs</code>
+              <span className="method-state automatic">Complete replay</span>
             </div>
             <div>
               <strong>USD market attribution</strong>
@@ -1089,14 +1188,12 @@ export default async function Home() {
             </div>
           </div>
           <div className="terminology-note">
-            <strong>What the API term “candidate” means</strong>
+            <strong>HyperEVM coverage boundary</strong>
             <p>
-              It never means fabricated or test data. It means the value is an
-              exact, attributable onchain observation whose broader accounting
-              methodology has not been promoted to protocol-authoritative
-              status. The dashboard replaces that internal lifecycle term with
-              the concrete evidence state: finalized onchain, price-attributed,
-              reconciled, or awaiting coverage.
+              HyperEVM current state and seven-day YPO are verified for blocks
+              39,958,147–40,572,940. Its lifetime transfer, holder, and all-time
+              YPO totals are intentionally omitted rather than inferred from a
+              partial history.
             </p>
           </div>
           <div className="trust-footer">
@@ -1124,12 +1221,9 @@ export default async function Home() {
         </section>
 
         <footer>
-          <div className="brand footer-brand">
-            <span className="brand-mark">P</span>
-            <span>
-              <strong>Parallel Watch</strong>
-              <small>Independent integration prototype</small>
-            </span>
+          <div className="footer-brand">
+            <span className="stablewatch-wordmark">stablewatch</span>
+            <small>Integration prototype</small>
           </div>
           <p>
             USDp and sUSDp are products of Parallel. This independent project is

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readLatestGlobalSavings } from "@/analytics/global-queries";
 import { readLatestSavingsHistory } from "@/analytics/history-queries";
+import { readLifetimeDashboard } from "@/analytics/dashboard-readiness";
 import { readPrices } from "@/analytics/queries";
 import { readLatestGlobalUsdpSupply } from "@/analytics/usdp-supply-queries";
 import { parseRuntimeEnv } from "@/config/env";
@@ -14,14 +15,23 @@ export async function GET() {
     const env = parseRuntimeEnv(process.env);
     const { pool } = createDatabase(env);
     try {
-      const [global, globalUsdp, history, prices] = await Promise.all([
-        readLatestGlobalSavings(pool, env.GLOBAL_SNAPSHOT_MAX_AGE_SECONDS),
-        readLatestGlobalUsdpSupply(pool, env.GLOBAL_SNAPSHOT_MAX_AGE_SECONDS),
-        readLatestSavingsHistory(pool),
-        readPrices(pool),
-      ]);
+      const [global, globalUsdp, history, lifetime, prices] = await Promise.all(
+        [
+          readLatestGlobalSavings(pool, env.GLOBAL_SNAPSHOT_MAX_AGE_SECONDS),
+          readLatestGlobalUsdpSupply(pool, env.GLOBAL_SNAPSHOT_MAX_AGE_SECONDS),
+          readLatestSavingsHistory(pool),
+          readLifetimeDashboard(pool),
+          readPrices(pool),
+        ],
+      );
       return NextResponse.json(
-        buildStablewatchAssetPayload({ global, globalUsdp, history, prices }),
+        buildStablewatchAssetPayload({
+          global,
+          globalUsdp,
+          history,
+          lifetime,
+          prices,
+        }),
       );
     } finally {
       await pool.end();
