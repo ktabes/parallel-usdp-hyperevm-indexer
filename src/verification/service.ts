@@ -364,6 +364,7 @@ export async function runVerificationSuite(
     latestPrice,
     yieldResult,
     rateEvents,
+    holderState,
   ] = await Promise.all([
     readBoundarySnapshots(
       options.pool,
@@ -455,6 +456,22 @@ export async function runVerificationSuite(
       options.fromBlock,
       options.toBlock,
     ),
+    options.pool.query<{
+      balance_sum: string;
+      complete: boolean;
+      source_to_block: string | null;
+    }>(
+      `select coalesce(sum(balance::numeric),0)::text as balance_sum,
+              coalesce(bool_and(history_complete),false) as complete,
+              max(source_to_block)::text as source_to_block
+         from holder_balances
+        where chain_id = $1 and asset_id = 'susdp'
+          and source_scope = $2`,
+      [
+        options.adapter.chainId,
+        `parallel-assets-${options.adapter.chainSlug}-lifetime-v1`,
+      ],
+    ),
   ]);
 
   const start = boundaries.start;
@@ -540,6 +557,13 @@ export async function runVerificationSuite(
       rateIntegratedYpo = undefined;
     }
   }
+  const holderRow = holderState.rows[0];
+  const holderHistoryComplete = Boolean(
+    lifetimeCoverage.complete &&
+    holderRow?.complete &&
+    holderRow.source_to_block !== null &&
+    BigInt(holderRow.source_to_block) >= options.toBlock,
+  );
 
   const results = evaluateCoreReconciliations({
     startUsdpSupply: optionalBigint(start?.usdp_total_supply),
@@ -572,8 +596,10 @@ export async function runVerificationSuite(
     directUnderlyingNet: coverage.complete ? directUnderlyingNet : undefined,
     convertedTotalSupplyAssets,
     endTotalAssets: optionalBigint(end?.susdp_total_assets),
-    holderBalanceSum: undefined,
-    holderHistoryComplete: false,
+    holderBalanceSum: holderHistoryComplete
+      ? optionalBigint(holderRow?.balance_sum)
+      : undefined,
+    holderHistoryComplete,
     rateIntegratedYpo,
     nativeYpo,
     indexedThroughBlock,
@@ -594,7 +620,7 @@ export async function runVerificationSuite(
     priceMaximumAgeSeconds: options.priceMaximumAgeSeconds ?? 60 * 60,
     implementationMatchesManifest,
     nativeYpo,
-    holderHistoryComplete: false,
+    holderHistoryComplete,
   });
   const persisted = await persistVerification({
     pool: options.pool,

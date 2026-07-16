@@ -1,5 +1,6 @@
 import { parseDiscoveryEnv, parseRuntimeEnv } from "@/config/env";
 import { rebuildFlowAnalytics } from "@/analytics/service";
+import { rebuildHolderLedger } from "@/analytics/holders";
 import {
   readLatestYield,
   readPrices,
@@ -95,6 +96,15 @@ function requestedHistoryChains() {
   ].filter(Boolean);
   if (chains.length === 0) throw new Error("At least one chain is required");
   return chains;
+}
+
+function requestedAdapter(defaultSlug = "hyperevm") {
+  const chainSlug = argument("--chain") ?? defaultSlug;
+  const adapter = savingsChainAdapters.find(
+    (candidate) => candidate.chainSlug === chainSlug,
+  );
+  if (!adapter) throw new Error(`Unsupported chain: ${chainSlug}`);
+  return adapter;
 }
 
 function progressReporter() {
@@ -296,7 +306,11 @@ async function showIndexerStatus() {
   const { pool } = createDatabase(env);
   try {
     console.log(
-      JSON.stringify(await indexerStatus(pool, indexerScope()), null, 2),
+      JSON.stringify(
+        await indexerStatus(pool, indexerScope(), requestedAdapter().chainId),
+        null,
+        2,
+      ),
     );
   } finally {
     await pool.end();
@@ -314,6 +328,7 @@ async function showCoverage() {
           indexerScope(),
           BigInt(requiredArgument("--from-block")),
           BigInt(requiredArgument("--to-block")),
+          requestedAdapter().chainId,
         ),
         null,
         2,
@@ -697,6 +712,35 @@ async function verifyDataIntegrity() {
   }
 }
 
+async function replayHolders() {
+  const env = parseRuntimeEnv(process.env);
+  const chainSlug = argument("--chain") ?? "base";
+  const adapter = savingsChainAdapters.find(
+    (candidate) => candidate.chainSlug === chainSlug,
+  );
+  if (!adapter) throw new Error(`Unsupported holder chain: ${chainSlug}`);
+  const { pool } = createDatabase(env);
+  try {
+    console.log(
+      JSON.stringify(
+        await rebuildHolderLedger({
+          pool,
+          adapter,
+          scope:
+            argument("--scope") ??
+            `parallel-assets-${adapter.chainSlug}-lifetime-v1`,
+          fromBlock: BigInt(requiredArgument("--from-block")),
+          toBlock: BigInt(requiredArgument("--to-block")),
+        }),
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await pool.end();
+  }
+}
+
 async function calculateYield() {
   const env = parseRuntimeEnv(process.env);
   const { pool } = createDatabase(env);
@@ -768,6 +812,9 @@ async function main() {
     case "verify":
       await verifyDataIntegrity();
       return;
+    case "holders-replay":
+      await replayHolders();
+      return;
     case "derive-flows":
       await deriveFlows();
       return;
@@ -812,7 +859,7 @@ async function main() {
       return;
     default:
       throw new Error(
-        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|verify|derive-flows|snapshot|snapshot-all|history-plan|history-boundaries|history-backfill|history-reconcile|lifetime-plan|lifetime-backfill|calculate-yield|state|yield|rates|price|global|history>",
+        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|verify|holders-replay|derive-flows|snapshot|snapshot-all|history-plan|history-boundaries|history-backfill|history-reconcile|lifetime-plan|lifetime-backfill|calculate-yield|state|yield|rates|price|global|history>",
       );
   }
 }

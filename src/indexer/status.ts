@@ -36,30 +36,35 @@ export async function verifyCoverage(
   };
 }
 
-export async function indexerStatus(pool: Pool, scope: string) {
+export async function indexerStatus(
+  pool: Pool,
+  scope: string,
+  chainId = HYPEREVM_CHAIN_ID,
+) {
   const [checkpoint, totals, runs] = await Promise.all([
     pool.query(
       `select next_block, last_completed_block, last_completed_block_hash, updated_at
        from indexer_checkpoints where chain_id = $1 and scope = $2`,
-      [HYPEREVM_CHAIN_ID, scope],
+      [chainId, scope],
     ),
     pool.query(
       `select
          (select count(*) from raw_logs where chain_id = $1) as raw_logs,
          (select count(*) from protocol_events where chain_id = $1) as protocol_events,
          (select count(*) from indexer_coverage where chain_id = $1 and scope = $2) as coverage_ranges`,
-      [HYPEREVM_CHAIN_ID, scope],
+      [chainId, scope],
     ),
     pool.query(
       `select id, run_type, from_block, to_block, status, counters, failure,
               started_at, finished_at
        from indexer_runs where chain_id = $1
        order by started_at desc limit 5`,
-      [HYPEREVM_CHAIN_ID],
+      [chainId],
     ),
   ]);
   return {
     scope,
+    chainId,
     checkpoint: checkpoint.rows[0] ?? null,
     totals: totals.rows[0] ?? null,
     recentRuns: runs.rows.map((run) => {

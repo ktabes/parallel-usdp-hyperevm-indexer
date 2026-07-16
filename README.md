@@ -60,6 +60,7 @@ npm run cli -- lifetime-plan --chains ethereum,base,sonic,avalanche
 npm run cli -- lifetime-backfill --chain base
 npm run cli -- lifetime-backfill --chain base --to-block FIXED_GOAL_BLOCK
 npm run cli -- lifetime-backfill --chain ethereum --log-rpc-url https://eth.drpc.org
+npm run cli -- holders-replay --chain base --from-block FROM --to-block TO
 npm run cli -- history
 npm run cli -- calculate-yield --from-block START --to-block END
 npm run cli -- state
@@ -117,6 +118,13 @@ For cross-chain current state, configure `ETHEREUM_RPC_URL`, `BASE_RPC_URL`, `SO
 Cross-chain historical backfills are never started by web-service deployment. Plan the aligned range first, capture both historical boundaries, and then run one bounded chain backfill. Savings history requests only the sUSDp vault logs needed for Deposit, Withdraw, Accrued, rate, pause, and share-transfer evidence; high-volume USDp token transfers belong to the later standalone USDp distribution/bridge lane. `--log-rpc-url` can assign a separate historical log provider after the configured chain RPC proves the pinned state boundaries. `--window-end` pins the common Unix end timestamp so a later invocation resumes the same scope instead of silently planning a moving seven-day window. The default chain set for planning is Ethereum, Base, Sonic, and Avalanche; add `--chain hyperevm` explicitly when its historical provider budget is available. Candidate chain YPO is stored with exact component provenance but is excluded from a global YPO total until independent rate reconciliation promotes it to verified.
 
 `lifetime-plan` and `lifetime-backfill` are the standalone dual-asset activity lane. Each chain begins at the earlier verified deployment block for USDp or sUSDp and ingests both contracts through a finalized head. Deployment boundaries and their evidence sources are stored in `asset_deployments`; chain-specific `parallel-assets-*-lifetime-v1` checkpoints make the work resumable and prevent it from changing seven-day history coverage. Run only one lifetime chain worker at a time. It may run beside the isolated HyperEVM history worker because the scopes, chain IDs, providers, and advisory locks are independent. Base, Sonic, and Avalanche use their configured public RPCs; Ethereum may use the tested dRPC log endpoint shown above without changing its configured state provider.
+
+After gap-free lifetime coverage, the same command replays both token Transfer
+histories from deployment, persists zero-address-excluded balances, and writes
+provenance-bound active/new-holder, peer-transfer, mint, burn, and participant
+metrics. `holders-replay` reruns only that deterministic derived layer. It
+writes nothing when coverage is partial and rejects any replay that would make
+a holder balance negative.
 
 ## Phase gates
 

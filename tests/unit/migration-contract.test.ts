@@ -131,4 +131,20 @@ describe("initial migration contract", () => {
     expect(migration).toContain('"tolerance" text');
     expect(migration).toContain('CONSTRAINT "health_findings_status_check"');
   });
+
+  it("persists provenance-bound lifetime holders and asset activity", async () => {
+    const migration = await readFile(
+      "drizzle/0008_medical_unicorn.sql",
+      "utf8",
+    );
+
+    expect(migration).toContain('CREATE TABLE "holder_balances"');
+    expect(migration).toContain('CREATE TABLE "asset_activity_aggregates"');
+    expect(migration).toContain('"first_positive_block" bigint');
+    expect(migration).toContain('"history_complete" boolean NOT NULL');
+    expect(migration).toContain('CONSTRAINT "holder_balances_amount_check"');
+    expect(migration).toContain(
+      'CREATE UNIQUE INDEX "asset_activity_provenance_unique"',
+    );
+  });
 });

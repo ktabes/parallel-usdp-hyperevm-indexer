@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import type { RuntimeEnv } from "@/config/env";
 import { rebuildFlowAnalytics } from "./service";
+import { rebuildHolderLedger } from "./holders";
 import {
   configuredSavingsChainAdapters,
   type SavingsChainAdapter,
@@ -181,9 +182,20 @@ export async function runLifetimeActivityRange(
       toBlock,
       manifestVersion: `parallel-assets-${adapter.chainSlug}-lifetime-v1-candidate`,
     });
+    const holders = await rebuildHolderLedger({
+      pool: options.pool,
+      adapter,
+      scope,
+      fromBlock,
+      toBlock,
+    });
     return {
       status:
-        flows.status === "candidate" ? ("candidate" as const) : flows.status,
+        flows.status === "candidate" && holders.status === "complete"
+          ? ("candidate" as const)
+          : flows.status === "candidate"
+            ? holders.status
+            : flows.status,
       chainId: adapter.chainId,
       chainSlug: adapter.chainSlug,
       scope,
@@ -191,6 +203,7 @@ export async function runLifetimeActivityRange(
       toBlock: toBlock.toString(),
       ingestion,
       flows,
+      holders,
     };
   } finally {
     await lock.query(`select pg_advisory_unlock($1, hashtext($2))`, [

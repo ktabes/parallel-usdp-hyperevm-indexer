@@ -990,6 +990,126 @@ export const healthFindings = pgTable(
   ],
 );
 
+export const holderBalances = pgTable(
+  "holder_balances",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    assetId: text("asset_id").notNull(),
+    holderAddress: text("holder_address").notNull(),
+    balance: text("balance").notNull(),
+    firstPositiveBlock: bigint("first_positive_block", { mode: "bigint" }),
+    lastChangedBlock: bigint("last_changed_block", {
+      mode: "bigint",
+    }).notNull(),
+    sourceScope: text("source_scope").notNull(),
+    sourceFromBlock: bigint("source_from_block", { mode: "bigint" }).notNull(),
+    sourceToBlock: bigint("source_to_block", { mode: "bigint" }).notNull(),
+    historyComplete: boolean("history_complete").notNull(),
+    manifestVersion: text("manifest_version").notNull(),
+    calculationVersion: text("calculation_version").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("holder_balances_scope_asset_holder_unique").on(
+      table.chainId,
+      table.sourceScope,
+      table.assetId,
+      table.holderAddress,
+    ),
+    index("holder_balances_active_idx").on(
+      table.chainId,
+      table.assetId,
+      table.balance,
+    ),
+    check(
+      "holder_balances_asset_check",
+      sql`${table.assetId} in ('usdp', 'susdp')`,
+    ),
+    check("holder_balances_amount_check", sql`${table.balance} ~ '^[0-9]+$'`),
+    check(
+      "holder_balances_address_check",
+      sql`${table.holderAddress} ~ '^0x[0-9a-f]{40}$'`,
+    ),
+    check(
+      "holder_balances_source_range_check",
+      sql`${table.sourceToBlock} >= ${table.sourceFromBlock}`,
+    ),
+  ],
+);
+
+export const assetActivityAggregates = pgTable(
+  "asset_activity_aggregates",
+  {
+    id: bigserial("id", { mode: "bigint" }).primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    assetId: text("asset_id").notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    windowEnd: timestamp("window_end", { withTimezone: true }).notNull(),
+    transferVolume: text("transfer_volume").notNull(),
+    mintedVolume: text("minted_volume").notNull(),
+    burnedVolume: text("burned_volume").notNull(),
+    transferCount: integer("transfer_count").notNull(),
+    uniqueSenders: integer("unique_senders").notNull(),
+    uniqueReceivers: integer("unique_receivers").notNull(),
+    uniqueParticipants: integer("unique_participants").notNull(),
+    newHolders: integer("new_holders").notNull(),
+    activeHolders: integer("active_holders").notNull(),
+    sourceScope: text("source_scope").notNull(),
+    sourceFromBlock: bigint("source_from_block", { mode: "bigint" }).notNull(),
+    sourceToBlock: bigint("source_to_block", { mode: "bigint" }).notNull(),
+    historyComplete: boolean("history_complete").notNull(),
+    manifestVersion: text("manifest_version").notNull(),
+    calculationVersion: text("calculation_version").notNull(),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("asset_activity_provenance_unique").on(
+      table.chainId,
+      table.assetId,
+      table.sourceScope,
+      table.sourceFromBlock,
+      table.sourceToBlock,
+      table.calculationVersion,
+    ),
+    index("asset_activity_chain_window_idx").on(
+      table.chainId,
+      table.assetId,
+      table.windowStart,
+      table.windowEnd,
+    ),
+    check(
+      "asset_activity_asset_check",
+      sql`${table.assetId} in ('usdp', 'susdp')`,
+    ),
+    check(
+      "asset_activity_amounts_check",
+      sql`${table.transferVolume} ~ '^[0-9]+$'
+        and ${table.mintedVolume} ~ '^[0-9]+$'
+        and ${table.burnedVolume} ~ '^[0-9]+$'`,
+    ),
+    check(
+      "asset_activity_counts_check",
+      sql`${table.transferCount} >= 0
+        and ${table.uniqueSenders} >= 0
+        and ${table.uniqueReceivers} >= 0
+        and ${table.uniqueParticipants} >= 0
+        and ${table.newHolders} >= 0
+        and ${table.activeHolders} >= 0`,
+    ),
+    check(
+      "asset_activity_window_check",
+      sql`${table.windowEnd} >= ${table.windowStart}`,
+    ),
+    check(
+      "asset_activity_source_range_check",
+      sql`${table.sourceToBlock} >= ${table.sourceFromBlock}`,
+    ),
+  ],
+);
+
 export const globalSavingsYieldComponents = pgTable(
   "global_savings_yield_components",
   {
