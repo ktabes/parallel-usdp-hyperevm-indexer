@@ -32,8 +32,116 @@ paths:
                     const: unavailable
                   error:
                     type: string
+  /api/analytics/usdp-supply:
+    get:
+      operationId: getGlobalUsdpSupply
+      summary: Get aligned current USDp supply across all 24 deployments
+      responses:
+        "200":
+          description: Candidate/verified supply, exact component coverage, and provenance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GlobalUsdpSupply"
+  /api/analytics/range:
+    get:
+      operationId: getParallelRangeAnalytics
+      summary: Get coverage-gated activity, holder, flow, and YPO metrics for a range
+      parameters:
+        - in: query
+          name: range
+          schema:
+            enum: [7d, 30d, 90d, all]
+            default: 7d
+        - in: query
+          name: chains
+          description: Comma-separated savings-chain slugs or all
+          schema:
+            type: string
+            default: all
+        - in: query
+          name: assets
+          description: usdp, susdp, or both as a comma-separated value
+          schema:
+            type: string
+            default: usdp,susdp
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: asOf
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Range metrics with per-component coverage and availability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RangeAnalytics"
+        "400":
+          description: Invalid range, chain, asset, or timestamp parameters
 components:
   schemas:
+    GlobalUsdpSupply:
+      type: object
+      required:
+        - status
+        - snapshotStatus
+        - accountingStatus
+        - candidateTotalSupply
+        - coverage
+        - components
+      properties:
+        status:
+          enum: [complete, partial, unavailable, stale]
+        snapshotStatus:
+          enum: [complete, partial, unavailable]
+        accountingStatus:
+          enum: [candidate, verified]
+        candidateTotalSupply:
+          type: string
+          pattern: "^[0-9]+$"
+        verifiedTotalSupply:
+          type: [string, "null"]
+        coverage:
+          type: object
+          additionalProperties: true
+        components:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      additionalProperties: true
+    RangeAnalytics:
+      type: object
+      required: [status, range, coverage, chains, global]
+      properties:
+        status:
+          enum: [complete, partial, unavailable]
+        range:
+          type: object
+          additionalProperties: true
+        coverage:
+          type: object
+          additionalProperties: true
+        chains:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        global:
+          type: object
+          additionalProperties: true
+      additionalProperties: false
     MetricValue:
       type: object
       required: [availability, verification, value, unit]

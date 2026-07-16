@@ -2,9 +2,14 @@
 
 ## What is ready
 
-The service exposes one versioned, read-only integration endpoint:
+The service exposes one versioned StableWatch projection plus two supporting
+read-only evidence endpoints:
 
 `GET /api/v1/stablewatch/assets/parallel-usdp-susdp`
+
+`GET /api/analytics/usdp-supply`
+
+`GET /api/analytics/range?range=7d&chains=base&assets=usdp,susdp`
 
 Production base URL: <https://content-spirit-production-5efa.up.railway.app>
 
@@ -27,6 +32,12 @@ panel. The contract is documented in
 | 30d/90d/all-time YPO | matching `marketRow` fields | Explicitly unavailable until those windows are indexed                         |
 | Chain detail         | `detail.chainBreakdown`     | Finalized block, vault state, share price, estimated APY, and history state    |
 | Trust                | `trust`                     | Freshness, expected/included/missing chains, versions, and source registry     |
+| Global USDp supply   | `detail.usdpSupply.global`  | Aligned 24-chain sum, candidate until bridge reconciliation promotes it        |
+
+The range endpoint supports `7d`, `30d`, `90d`, `all`, or explicit `from` and
+`to` timestamps. It returns transfer/mint/burn activity, holder counts,
+ERC-4626 deposits/withdrawals, and YPO only when the complete requested history
+is proven. Missing long-window data remains a typed unavailable component.
 
 Lending-only concepts such as borrowers, borrows, repays, and liquidations are
 listed under `nonApplicableMetrics`. They are not native issuer/savings-vault
@@ -78,18 +89,23 @@ server-side Railway variables and are never part of the response.
    in an expandable methodology surface.
 6. Treat additions as backward-compatible within v1; a breaking field or unit
    change requires a new route/version.
+7. Run `npm run reviewer:proof` to validate the public deployment and the
+   critical projection invariants in one command.
 
 ## Known boundaries at handoff
 
 - Five-chain current sUSDp state is implemented.
 - The aligned seven-day history becomes global only after HyperEVM finishes and
   reconciliation passes. Until then, the API correctly reports partial history.
-- USDp is registered on 24 chains, but global USDp circulating supply remains
-  unavailable until every deployment and the LayerZero bridge accounting are
-  verified. The five-chain `supplyOnSavingsChains` number is not global supply.
+- All 24 USDp deployments now have aligned current `totalSupply`, bytecode, and
+  metadata evidence. The summed value is available as a candidate; it is not
+  promoted to verified circulating supply until LayerZero bridge topology and
+  message reconciliation pass.
 - The attributed USD price is currently a DIA observation from HyperEVM. The
   response labels this as candidate cross-chain attribution.
-- 30d, 90d, all-time, and aligned TVL/APY chart series are not synthesized.
+- The range API can serve 30d, 90d, and all-time activity wherever lifetime
+  coverage is complete. Long-window YPO and aligned TVL/APY series remain
+  unavailable until exact boundary intervals exist; they are not synthesized.
 
 ## Repository verification
 

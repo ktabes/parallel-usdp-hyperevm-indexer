@@ -25,6 +25,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "secrets": "node --import tsx scripts/check-secrets.ts",
+    "reviewer:proof": "node --import tsx scripts/reviewer-proof.ts",
     "check": "npm run secrets && npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {

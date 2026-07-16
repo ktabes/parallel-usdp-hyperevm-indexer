@@ -71,6 +71,7 @@ npm run cli -- price
 npm run cli -- global
 npm run cli -- global-usdp
 npm run cli -- range --range 7d --chains base --assets usdp,susdp
+npm run reviewer:proof
 npm run test:unit
 npm run test:fixtures
 npm run test:integration
@@ -82,6 +83,12 @@ npm run test:network
 `snapshot` captures the original HyperEVM contract state and DIA price evidence at a finalized block. `snapshot-all` captures both the five-chain savings state and the 24-chain USDp supply cycle; `snapshot-usdp` runs only the inexpensive supply cycle. `global-usdp` reads its latest coverage-gated aggregate. `range` reads coverage-gated 7d, 30d, 90d, all-time, or explicit ISO timestamp activity, holder, savings-flow, and contiguous YPO metrics. The HTTP equivalent is `/api/analytics/range?range=7d&chains=base&assets=usdp,susdp`. `history-plan` resolves independent chain blocks onto one UTC window without writing. `history-boundaries` proves both pinned historical state reads before log spending begins. `history-backfill` then uses the same immutable log, checkpoint, coverage, flow, and YPO pipeline for one or more selected savings chains; it is deliberately manual and resumable. `calculate-yield` retains the original HyperEVM-only command. The read-only analytics API is available at `/api/analytics/state`, `/api/analytics/yield`, `/api/analytics/rates`, `/api/analytics/price`, `/api/analytics/global`, `/api/analytics/usdp-supply`, `/api/analytics/range`, and `/api/analytics/history`; missing, stale, partial, candidate, or unreconciled data remains explicit rather than being synthesized. The public inspection dashboard is served at `/`, and the versioned StableWatch-oriented integration contract is served at `/api/v1/stablewatch/assets/parallel-usdp-susdp`.
 
 Network tests are opt-in and require `RUN_NETWORK_TESTS=1` plus a real `HYPEREVM_RPC_URL`. Integration tests run when `TEST_DATABASE_URL` is present and otherwise report as skipped.
+
+For a credential-free review of the deployed service, run
+`npm run reviewer:proof`. It verifies public health, complete 24-chain USDp
+supply evidence, Base lifetime USDp+sUSDp analytics, and the versioned
+StableWatch projection. See the [reviewer runbook](docs/reviewer-runbook.md) for
+the five-minute walkthrough and claim-to-code traceability map.
 
 The official HyperEVM RPC is the default seven-day log source. It limits `eth_getLogs` to 50-block ranges and approximately 100 requests per minute, so the initial week is a long, resumable one-time job rather than a deployment startup task. Ingestion defaults to one request start every 1,500 ms, applies jittered backoff, retries rate limits indefinitely, and commits each successful range before continuing. The optional `ALCHEMY_API_KEY` provides recent-state reads but is not treated as historical. OnFinality remains optional for strict archive certification. Provider roles are assigned from live capability evidence rather than marketing claims.
 
@@ -150,4 +157,4 @@ a holder balance negative.
 9. Reconciliation, owner review, and the public inspection dashboard.
 10. Railway deployment and StableWatch integration handoff.
 
-See [methodology](docs/methodology.md), [metric contract](docs/metric-contract.md), [schema notes](docs/schema.md), the [StableWatch handoff](docs/stablewatch-integration-handoff.md), the [24-chain bridge accounting research](docs/research/parallel-usdp-24-chain-bridge-accounting-2026-07-16.md), and the [cross-chain scope decision](docs/decisions/0002-cross-chain-asset-scope.md).
+See [methodology](docs/methodology.md), [metric contract](docs/metric-contract.md), [schema notes](docs/schema.md), the [reviewer runbook](docs/reviewer-runbook.md), the [StableWatch handoff](docs/stablewatch-integration-handoff.md), the [24-chain bridge accounting research](docs/research/parallel-usdp-24-chain-bridge-accounting-2026-07-16.md), and the [cross-chain scope decision](docs/decisions/0002-cross-chain-asset-scope.md).
