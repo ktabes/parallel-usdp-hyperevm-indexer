@@ -27,6 +27,9 @@ sends and receives are not added because the OFT path burns on the source and
 mints on the destination. Even complete 24-chain RPC coverage remains marked
 `candidate` until bridge contracts, peers, and message GUID lifecycles are
 reconciled. The API exposes candidate and verified totals separately.
+Each component read has a bounded retry budget. BNB additionally rotates across
+multiple public endpoints documented by BNB Chain; persistent failures still
+remain explicit failed-chain evidence rather than being hidden.
 
 ## Historical windows
 

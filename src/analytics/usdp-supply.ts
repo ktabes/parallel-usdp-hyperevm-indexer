@@ -537,19 +537,31 @@ async function mapWithConcurrency<T, R>(
 export async function runWithSupplyRpcFailover<T>(options: {
   rpcUrls: readonly string[];
   operation: (rpcUrl: string) => Promise<T>;
+  attemptsPerRpc?: number;
+  retryDelayMs?: number;
 }) {
   if (options.rpcUrls.length === 0)
     throw new Error("USDp supply RPC candidate list is empty");
+  const attemptsPerRpc = options.attemptsPerRpc ?? 3;
+  if (!Number.isInteger(attemptsPerRpc) || attemptsPerRpc < 1)
+    throw new Error("USDp supply attempts per RPC must be a positive integer");
+  const retryDelayMs = options.retryDelayMs ?? 250;
   let lastError: unknown;
   for (const rpcUrl of options.rpcUrls) {
-    try {
-      return await options.operation(rpcUrl);
-    } catch (error) {
-      lastError = error;
+    for (let attempt = 1; attempt <= attemptsPerRpc; attempt += 1) {
+      try {
+        return await options.operation(rpcUrl);
+      } catch (error) {
+        lastError = error;
+        if (attempt < attemptsPerRpc && retryDelayMs > 0)
+          await new Promise((resolve) =>
+            setTimeout(resolve, retryDelayMs * attempt),
+          );
+      }
     }
   }
   throw new Error(
-    `All ${options.rpcUrls.length} USDp supply RPC candidates failed: ${providerErrorMessage(lastError)}`,
+    `All ${options.rpcUrls.length} USDp supply RPC candidates failed after ${attemptsPerRpc} attempt(s) each: ${providerErrorMessage(lastError)}`,
     { cause: lastError },
   );
 }

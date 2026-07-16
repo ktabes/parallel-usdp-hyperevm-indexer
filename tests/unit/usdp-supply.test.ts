@@ -121,6 +121,8 @@ describe("USDp supply RPC failover", () => {
     await expect(
       runWithSupplyRpcFailover({
         rpcUrls: ["primary", "fallback"],
+        attemptsPerRpc: 2,
+        retryDelayMs: 0,
         operation: async (rpcUrl) => {
           attempted.push(rpcUrl);
           if (rpcUrl === "primary") throw new Error("temporarily unavailable");
@@ -128,6 +130,6 @@ describe("USDp supply RPC failover", () => {
         },
       }),
     ).resolves.toBe("snapshot");
-    expect(attempted).toEqual(["primary", "fallback"]);
+    expect(attempted).toEqual(["primary", "primary", "fallback"]);
   });
 });

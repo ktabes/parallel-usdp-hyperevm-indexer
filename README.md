@@ -142,9 +142,10 @@ uses the savings-chain URLs where configured and public chain defaults for the
 remaining distribution chains. `USDP_CHAIN_RPC_URLS` can override any chain as
 a JSON object keyed by numeric chain ID. `USDP_SUPPLY_ALIGNMENT_MAX_SKEW_SECONDS`
 defaults to `1800`; components outside that block-time window are excluded and
-reported rather than silently added. The BNB adapter has bounded failover
-across multiple BNB Chain-documented public endpoints so one transient public
-node does not unnecessarily reduce an otherwise complete cycle.
+reported rather than silently added. Every component has bounded retry, and the
+BNB adapter also fails over across multiple BNB Chain-documented public
+endpoints, so one transient public-node response does not unnecessarily reduce
+an otherwise complete cycle.
 
 Cross-chain historical backfills are never started by web-service deployment. Plan the aligned range first, capture both historical boundaries, and then run one bounded chain backfill. Savings history requests only the sUSDp vault logs needed for Deposit, Withdraw, Accrued, rate, pause, and share-transfer evidence; high-volume USDp token transfers belong to the later standalone USDp distribution/bridge lane. `--log-rpc-url` can assign a separate historical log provider after the configured chain RPC proves the pinned state boundaries. `--window-end` pins the common Unix end timestamp so a later invocation resumes the same scope instead of silently planning a moving seven-day window. The default chain set for planning is Ethereum, Base, Sonic, and Avalanche; add `--chain hyperevm` explicitly when its historical provider budget is available. Candidate chain YPO is stored with exact component provenance but is excluded from a global YPO total until independent rate reconciliation promotes it to verified.
 
