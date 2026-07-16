@@ -785,12 +785,12 @@ export default async function Home() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">Lifetime activity</p>
-              <h2>Pre-wired for completed chain histories</h2>
+              <h2>Complete deployment-to-goal histories</h2>
             </div>
             <p>
-              Checkpoints update while indexing. Exact activity, holder, and
-              vault-flow metrics publish only after the full deployment range is
-              gap-free and both asset ledgers are derived.
+              Exact activity, holder, and vault-flow metrics publish only after
+              the full deployment range is gap-free and both asset ledgers are
+              derived. All four supported lifetime scopes now satisfy that gate.
             </p>
           </div>
 
@@ -1014,8 +1014,8 @@ export default async function Home() {
               ))}
             </div>
             <p className="coverage-note">
-              Global YPO fails closed until all component windows are aligned
-              and independently reconciled.
+              Global YPO is published only after all component windows are
+              aligned and independently reconciled.
             </p>
           </aside>
         </section>
