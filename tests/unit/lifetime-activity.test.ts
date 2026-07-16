@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  capLifetimeActivityRange,
   lifetimeActivityFromBlock,
   lifetimeActivityRequestCount,
   lifetimeActivityScope,
@@ -36,5 +37,19 @@ describe("lifetime dual-asset activity planning", () => {
     expect(lifetimeActivityRequestCount(10n, 2_009n, 2_000)).toBe(1n);
     expect(lifetimeActivityRequestCount(10n, 2_010n, 2_000)).toBe(2n);
     expect(lifetimeActivityRequestCount(11n, 10n, 2_000)).toBe(0n);
+  });
+
+  it("caps a moving finalized range at an immutable operator goal", () => {
+    const range = {
+      adapter: {} as never,
+      rpcUrl: "https://rpc.example",
+      fromBlock: 100n,
+      toBlock: 500n,
+    };
+    expect(capLifetimeActivityRange(range, 400n).toBlock).toBe(400n);
+    expect(capLifetimeActivityRange(range, 600n)).toBe(range);
+    expect(() => capLifetimeActivityRange(range, 99n)).toThrow(
+      /precedes deployment block/,
+    );
   });
 });

@@ -57,6 +57,7 @@ npm run worker:hyperevm-history
 npm run cli -- history-reconcile --chains base,sonic,avalanche
 npm run cli -- lifetime-plan --chains ethereum,base,sonic,avalanche
 npm run cli -- lifetime-backfill --chain base
+npm run cli -- lifetime-backfill --chain base --to-block FIXED_GOAL_BLOCK
 npm run cli -- lifetime-backfill --chain ethereum --log-rpc-url https://eth.drpc.org
 npm run cli -- history
 npm run cli -- calculate-yield --from-block START --to-block END

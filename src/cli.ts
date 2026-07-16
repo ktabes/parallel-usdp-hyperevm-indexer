@@ -21,6 +21,7 @@ import {
 } from "@/analytics/savings-history";
 import { reconcileLatestSavingsYield } from "@/analytics/yield-reconciliation";
 import {
+  capLifetimeActivityRange,
   lifetimeActivityRequestCount,
   lifetimeActivityScope,
   lifetimeChunkSizes,
@@ -73,6 +74,13 @@ function historyWindowEnd() {
   if (value === undefined) return undefined;
   if (!/^\d+$/.test(value) || BigInt(value) < 1n)
     throw new Error("--window-end must be a positive Unix timestamp");
+  return BigInt(value);
+}
+
+function optionalBlockArgument(name: string) {
+  const value = argument(name);
+  if (value === undefined) return undefined;
+  if (!/^\d+$/.test(value)) throw new Error(`${name} must be a block number`);
   return BigInt(value);
 }
 
@@ -550,6 +558,7 @@ async function backfillLifetimeActivity() {
     env,
     requestedHistoryChains(),
   );
+  const maximumToBlock = optionalBlockArgument("--to-block");
   const { pool } = createDatabase(env);
   const controller = new AbortController();
   const interrupt = () => controller.abort();
@@ -557,7 +566,8 @@ async function backfillLifetimeActivity() {
   process.once("SIGTERM", interrupt);
   try {
     await syncParallelAssetRegistry(pool);
-    for (const range of ranges) {
+    for (const resolvedRange of ranges) {
+      const range = capLifetimeActivityRange(resolvedRange, maximumToBlock);
       console.log(
         JSON.stringify({
           status: "chain-started",

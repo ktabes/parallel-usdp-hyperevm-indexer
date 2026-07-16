@@ -35,6 +35,19 @@ export interface LifetimeActivityRange {
   toBlock: bigint;
 }
 
+export function capLifetimeActivityRange(
+  range: LifetimeActivityRange,
+  maximumToBlock?: bigint,
+) {
+  if (maximumToBlock === undefined || maximumToBlock >= range.toBlock)
+    return range;
+  if (maximumToBlock < range.fromBlock)
+    throw new Error(
+      `Lifetime goal ${maximumToBlock} precedes deployment block ${range.fromBlock}`,
+    );
+  return { ...range, toBlock: maximumToBlock };
+}
+
 export function lifetimeActivityFromBlock(adapter: SavingsChainAdapter) {
   const usdpBlock = adapter.usdp.deploymentBlock;
   const susdpBlock = adapter.susdp.deploymentBlock;
