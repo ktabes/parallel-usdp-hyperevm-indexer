@@ -272,6 +272,13 @@ export default async function Home() {
   const globalSupply = BigInt(
     data.detail.usdpSupply.global.value ?? savingsSupply.toString(),
   );
+  const usdpOnlyDeploymentCount = Math.max(
+    0,
+    data.asset.stablecoin.expectedDeploymentCount -
+      data.detail.chainBreakdown.length,
+  );
+  const usdpOnlySupply =
+    globalSupply > savingsSupply ? globalSupply - savingsSupply : 0n;
   const totalShares = sum(
     data.detail.chainBreakdown.map((chain) => chain.susdpTotalSupply),
   );
@@ -595,6 +602,22 @@ export default async function Home() {
                     </div>
                   );
                 })}
+              </div>
+              <div className="deployment-footprint-note">
+                <span aria-hidden="true">+</span>
+                <div>
+                  <strong>
+                    {usdpOnlyDeploymentCount} additional USDp deployments
+                  </strong>
+                  <p>
+                    USDp also exists beyond the five savings chains—including
+                    BNB Chain and Sei—with{" "}
+                    {decimal(usdpOnlySupply.toString(), 18, 2)} USDp combined in
+                    this aligned snapshot. They are counted in global USDp
+                    supply but omitted from sUSDp TVL, APY, YPO, and lifetime
+                    savings metrics because sUSDp is not deployed there.
+                  </p>
+                </div>
               </div>
             </article>
 
