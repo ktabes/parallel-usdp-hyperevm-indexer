@@ -3,7 +3,10 @@ import { readLifetimeDashboard } from "@/analytics/dashboard-readiness";
 import { readLatestGlobalSavings } from "@/analytics/global-queries";
 import { readLatestSavingsHistory } from "@/analytics/history-queries";
 import { readPrices } from "@/analytics/queries";
-import { readLatestGlobalUsdpSupply } from "@/analytics/usdp-supply-queries";
+import {
+  readLatestGlobalUsdpSupply,
+  sumIncludedSupplyOutsideChains,
+} from "@/analytics/usdp-supply-queries";
 import { parseRuntimeEnv } from "@/config/env";
 import { createDatabase } from "@/db/client";
 import {
@@ -216,6 +219,7 @@ async function dashboardData() {
         history,
         prices,
       }),
+      globalUsdp,
       lifetime,
     };
   } finally {
@@ -225,7 +229,7 @@ async function dashboardData() {
 
 export default async function Home() {
   const dashboard = await dashboardData();
-  const { data, lifetime } = dashboard;
+  const { data, globalUsdp, lifetime } = dashboard;
   const { headline } = data.detail;
   const totalAssets = data.marketRow.tvlUsdp.value
     ? BigInt(data.marketRow.tvlUsdp.value)
@@ -241,8 +245,17 @@ export default async function Home() {
     data.asset.stablecoin.expectedDeploymentCount -
       data.detail.chainBreakdown.length,
   );
-  const usdpOnlySupply =
-    globalSupply > savingsSupply ? globalSupply - savingsSupply : 0n;
+  const savingsChainIds = new Set(
+    data.detail.chainBreakdown.map((chain) => chain.chainId),
+  );
+  const globalUsdpComponents =
+    "components" in globalUsdp && Array.isArray(globalUsdp.components)
+      ? globalUsdp.components
+      : [];
+  const usdpOnlySupply = sumIncludedSupplyOutsideChains(
+    globalUsdpComponents,
+    savingsChainIds,
+  );
   const totalShares = sum(
     data.detail.chainBreakdown.map((chain) => chain.susdpTotalSupply),
   );

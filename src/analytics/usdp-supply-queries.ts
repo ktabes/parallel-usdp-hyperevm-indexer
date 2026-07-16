@@ -41,6 +41,22 @@ interface ComponentRow {
   rpc_source: string;
 }
 
+export function sumIncludedSupplyOutsideChains(
+  components: readonly {
+    chainId: number;
+    included: boolean;
+    totalSupply: string;
+  }[],
+  savingsChainIds: ReadonlySet<number>,
+) {
+  return components
+    .filter(
+      (component) =>
+        component.included && !savingsChainIds.has(component.chainId),
+    )
+    .reduce((total, component) => total + BigInt(component.totalSupply), 0n);
+}
+
 export async function readLatestGlobalUsdpSupply(
   pool: Pool,
   maximumAgeSeconds: number,
