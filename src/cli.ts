@@ -15,6 +15,10 @@ import { captureConfiguredSavingsSnapshots } from "@/analytics/multichain-snapsh
 import { captureGlobalUsdpSupply } from "@/analytics/usdp-supply";
 import { readLatestGlobalUsdpSupply } from "@/analytics/usdp-supply-queries";
 import {
+  parseRangeAnalyticsRequest,
+  readRangeAnalytics,
+} from "@/analytics/range-analytics";
+import {
   captureSavingsChainSnapshot,
   syncParallelAssetRegistry,
 } from "@/analytics/multichain-snapshots";
@@ -691,6 +695,34 @@ async function showGlobalUsdpSupply() {
   }
 }
 
+async function showRangeAnalytics() {
+  const env = parseRuntimeEnv(process.env);
+  const params = new URLSearchParams();
+  for (const [argumentName, parameterName] of [
+    ["--range", "range"],
+    ["--chains", "chains"],
+    ["--assets", "assets"],
+    ["--from", "from"],
+    ["--to", "to"],
+    ["--as-of", "asOf"],
+  ] as const) {
+    const value = argument(argumentName);
+    if (value) params.set(parameterName, value);
+  }
+  const { pool } = createDatabase(env);
+  try {
+    console.log(
+      JSON.stringify(
+        await readRangeAnalytics(pool, parseRangeAnalyticsRequest(params)),
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await pool.end();
+  }
+}
+
 async function showSavingsHistory() {
   const env = parseRuntimeEnv(process.env);
   const { pool } = createDatabase(env);
@@ -896,12 +928,15 @@ async function main() {
     case "global-usdp":
       await showGlobalUsdpSupply();
       return;
+    case "range":
+      await showRangeAnalytics();
+      return;
     case "history":
       await showSavingsHistory();
       return;
     default:
       throw new Error(
-        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|verify|holders-replay|derive-flows|snapshot|snapshot-all|snapshot-usdp|history-plan|history-boundaries|history-backfill|history-reconcile|lifetime-plan|lifetime-backfill|calculate-yield|state|yield|rates|price|global|global-usdp|history>",
+        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|verify|holders-replay|derive-flows|snapshot|snapshot-all|snapshot-usdp|history-plan|history-boundaries|history-backfill|history-reconcile|lifetime-plan|lifetime-backfill|calculate-yield|state|yield|rates|price|global|global-usdp|range|history>",
       );
   }
 }

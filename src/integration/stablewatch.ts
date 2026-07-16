@@ -116,8 +116,27 @@ interface PricesInput {
   };
 }
 
+interface GlobalUsdpSupplyInput {
+  status: string;
+  asOf?: string;
+  accountingStatus?: "candidate" | "verified";
+  candidateTotalSupply?: string;
+  verifiedTotalSupply?: string | null;
+  freshness?: { stale?: boolean };
+  coverage?: {
+    expectedChainCount?: number;
+    includedChainCount?: number;
+    includedChainIds?: number[];
+    missingChainIds?: number[];
+    staleChainIds?: number[];
+    failedChainIds?: number[];
+  };
+  calculationVersion?: string;
+}
+
 export interface StablewatchPayloadInput {
   global: GlobalSavingsInput;
+  globalUsdp?: GlobalUsdpSupplyInput;
   history: HistoryInput;
   prices: PricesInput;
   generatedAt?: string;
@@ -169,6 +188,7 @@ function iso(value: string | Date | undefined) {
 
 export function buildStablewatchAssetPayload({
   global,
+  globalUsdp,
   history,
   prices,
   generatedAt = new Date().toISOString(),
@@ -182,6 +202,27 @@ export function buildStablewatchAssetPayload({
   const priceAvailable = Boolean(prices.usdp?.priceUsdAtomic);
   const priceStale = prices.usdp?.stale ?? true;
   const priceAsOf = iso(prices.blockTimestamp);
+  const globalUsdpValue =
+    globalUsdp?.accountingStatus === "verified"
+      ? globalUsdp.verifiedTotalSupply
+      : globalUsdp?.candidateTotalSupply;
+  let globalUsdpSupply = globalUsdpValue
+    ? availableMetric(globalUsdpValue, "usdp_base_units", {
+        verification:
+          globalUsdp?.accountingStatus === "verified"
+            ? "verified"
+            : "candidate",
+        asOf: globalUsdp?.asOf,
+        calculationVersion: globalUsdp?.calculationVersion,
+        attribution:
+          "Aligned sum of 24 onchain USDp totalSupply components; bridge accounting promotion remains separate",
+      })
+    : unavailableMetric(
+        "usdp_base_units",
+        "twenty_four_chain_supply_snapshot_missing",
+      );
+  if (globalUsdp?.status === "stale" || globalUsdp?.freshness?.stale)
+    globalUsdpSupply = staleMetric(globalUsdpSupply);
 
   let tvlUsdp = globalAvailable
     ? availableMetric(global.susdp!.totalAssetsUsdp!, "usdp_base_units", {
@@ -356,10 +397,7 @@ export function buildStablewatchAssetPayload({
               "usdp_base_units",
               "savings_chain_supply_missing",
             ),
-        global: unavailableMetric(
-          "usdp_base_units",
-          "twenty_four_chain_bridge_reconciliation_pending",
-        ),
+        global: globalUsdpSupply,
       },
       chainBreakdown: (global.components ?? [])
         .map((component) => {
@@ -471,6 +509,8 @@ export function buildStablewatchAssetPayload({
     trust: {
       freshness: global.freshness ?? null,
       coverage: global.coverage ?? null,
+      globalUsdpCoverage: globalUsdp?.coverage ?? null,
+      globalUsdpAccountingStatus: globalUsdp?.accountingStatus ?? null,
       globalHistoryStatus: history.status,
       expectedSavingsChainIds: savingsChainAdapters.map(
         (adapter) => adapter.chainId,

@@ -2,6 +2,7 @@ import Image from "next/image";
 import { readLatestGlobalSavings } from "@/analytics/global-queries";
 import { readLatestSavingsHistory } from "@/analytics/history-queries";
 import { readPrices } from "@/analytics/queries";
+import { readLatestGlobalUsdpSupply } from "@/analytics/usdp-supply-queries";
 import { parseRuntimeEnv } from "@/config/env";
 import { createDatabase } from "@/db/client";
 import {
@@ -204,12 +205,18 @@ async function dashboardData() {
   const env = parseRuntimeEnv(process.env);
   const { pool } = createDatabase(env);
   try {
-    const [global, history, prices] = await Promise.all([
+    const [global, globalUsdp, history, prices] = await Promise.all([
       readLatestGlobalSavings(pool, env.GLOBAL_SNAPSHOT_MAX_AGE_SECONDS),
+      readLatestGlobalUsdpSupply(pool, env.GLOBAL_SNAPSHOT_MAX_AGE_SECONDS),
       readLatestSavingsHistory(pool),
       readPrices(pool),
     ]);
-    return buildStablewatchAssetPayload({ global, history, prices });
+    return buildStablewatchAssetPayload({
+      global,
+      globalUsdp,
+      history,
+      prices,
+    });
   } finally {
     await pool.end();
   }
@@ -224,6 +231,9 @@ export default async function Home() {
   const savingsSupply = BigInt(
     data.detail.usdpSupply.onSavingsChains.value ?? "0",
   );
+  const globalSupply = BigInt(
+    data.detail.usdpSupply.global.value ?? savingsSupply.toString(),
+  );
   const totalShares = sum(
     data.detail.chainBreakdown.map((chain) => chain.susdpTotalSupply),
   );
@@ -235,7 +245,7 @@ export default async function Home() {
   );
   const portfolioSharePrice =
     totalShares > 0n ? (totalAssets * 10n ** 18n) / totalShares : 0n;
-  const vaultCapture = shareOf(totalAssets, savingsSupply);
+  const vaultCapture = shareOf(totalAssets, globalSupply);
   const pendingYieldShare = shareOf(pendingYield, totalAssets);
   const verifiedHistory = data.trust.verifiedHistoricalChainIds.length;
 
@@ -445,13 +455,11 @@ export default async function Home() {
           </article>
           <article className="metric-card">
             <div className="metric-card-head">
-              <p>USDp supply observed</p>
-              <span className="scope-pill">Savings chains</span>
+              <p>Global USDp supply</p>
+              <MetricStatus metric={data.detail.usdpSupply.global} />
             </div>
-            <strong>
-              {compact(data.detail.usdpSupply.onSavingsChains.value)}
-            </strong>
-            <small>Across the five official savings deployments</small>
+            <strong>{compact(data.detail.usdpSupply.global.value)}</strong>
+            <small>Aligned across all 24 registered deployments</small>
           </article>
         </section>
 
@@ -486,9 +494,9 @@ export default async function Home() {
                   <span>{pegDistance(headline.usdpPriceUsd.value)}</span>
                 </div>
                 <div>
-                  <small>Observed supply</small>
-                  <strong>{compact(savingsSupply.toString())}</strong>
-                  <span>USDp · savings chains</span>
+                  <small>Global observed supply</small>
+                  <strong>{compact(globalSupply.toString())}</strong>
+                  <span>USDp · 24 deployments</span>
                 </div>
                 <div>
                   <small>Vaulted into sUSDp</small>

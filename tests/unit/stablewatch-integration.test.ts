@@ -49,6 +49,23 @@ const baseInput = {
     components: [component],
     calculationVersion: "global-v1",
   },
+  globalUsdp: {
+    status: "complete",
+    asOf: "2026-07-16T00:00:00.000Z",
+    accountingStatus: "candidate" as const,
+    candidateTotalSupply: "2000000000000000000000000",
+    verifiedTotalSupply: null,
+    freshness: { stale: false },
+    coverage: {
+      expectedChainCount: 24,
+      includedChainCount: 24,
+      includedChainIds: Array.from({ length: 24 }, (_, index) => index + 1),
+      missingChainIds: [],
+      staleChainIds: [],
+      failedChainIds: [],
+    },
+    calculationVersion: "global-usdp-v1",
+  },
   history: {
     status: "partial",
     chains: [],
@@ -85,6 +102,11 @@ describe("StableWatch-compatible asset payload", () => {
     );
     expect(payload.marketRow.ypoSevenDay.availability).toBe("unavailable");
     expect(payload.detail.chainBreakdown[0]?.chainSlug).toBe("hyperevm");
+    expect(payload.detail.usdpSupply.global).toMatchObject({
+      availability: "available",
+      verification: "candidate",
+      value: "2000000000000000000000000",
+    });
   });
 
   it("promotes only a complete reconciled global history interval", () => {

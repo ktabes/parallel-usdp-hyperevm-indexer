@@ -32,6 +32,16 @@ reconciled. The API exposes candidate and verified totals separately.
 
 A cross-chain history job first chooses one UTC end time no later than the oldest configured chain's finalized timestamp, then resolves the first block at or after the common start and end timestamps independently on each chain. Both pinned boundary states must succeed before log ingestion begins. Each chain receives its own checkpoint and complete-coverage proof. Savings-history log queries target sUSDp only; unrelated high-volume USDp transfers are deferred to the standalone USDp distribution and bridge-accounting lane. Candidate YPO uses `Accrued` events in `(start_block,end_block]` plus the change in pending yield between the two exact boundary snapshots. A global YPO total includes only independently reconciled `verified` intervals within the alignment tolerance; candidate components remain visible but unsummed.
 
+The range API resolves 7d, 30d, 90d, all-time, or explicit ISO windows against
+the latest gap-free lifetime coverage for each requested asset and chain.
+Transfer, mint, burn, deposit, withdrawal, and participant metrics are queried
+from immutable decoded events inside the resolved timestamp window. Global
+amounts and event counts are additive; participant and new-holder counts are
+reported as chain-summed unless an explicit cross-chain identity rule exists.
+YPO can span multiple stored intervals only when they tile the full requested
+window without a gap. Candidate intervals keep the result candidate, and an
+incomplete interval sequence returns unavailable rather than a partial sum.
+
 ## Availability
 
 An unavailable metric is a typed result with a reason, not `0`, `null` without context, or an estimate presented as finalized. This applies especially to incomplete holder reconstruction, collateral backing, 30d/90d/all-time history, and external lending activity.
