@@ -19,6 +19,7 @@ import {
   type BlockRange,
 } from "./planner";
 import { providerErrorMessage } from "@/rpc/errors";
+import { isDailyRequestQuotaError } from "@/rpc/provider-failover";
 
 export const DEFAULT_INDEXER_SCOPE = "parallel-usdp-susdp-seven-day-v1";
 
@@ -141,6 +142,7 @@ async function fetchLogsWithPolicy(
       });
       return { range, logs, chunkSize };
     } catch (error) {
+      if (isDailyRequestQuotaError(error)) throw error;
       const errorClass = classifyRpcError(error);
       if (errorClass === "range" && chunkSize > 1) {
         const advertisedLimit = providerRangeLimit(error);
@@ -559,19 +561,20 @@ export async function ingestLogs(
     25,
     Math.floor((options.requestIntervalMs ?? 650) / blockFetchConcurrency),
   );
+  const blockRpcUrl = options.blockRpcUrl ?? options.rpcUrl;
   const blockClient =
-    blockFetchConcurrency === 1
+    blockFetchConcurrency === 1 && blockRpcUrl === options.rpcUrl
       ? client
-      : createEvmClient(chain, options.blockRpcUrl ?? options.rpcUrl, {
+      : createEvmClient(chain, blockRpcUrl, {
           minRequestIntervalMs: Math.max(25, blockRequestIntervalMs),
           retryCount: 0,
         });
   const finalizedBlock =
     options.adapter?.finality === "rpc-finalized"
-      ? await client.getBlock({ blockTag: "finalized" })
-      : await client.getBlock({
+      ? await blockClient.getBlock({ blockTag: "finalized" })
+      : await blockClient.getBlock({
           blockNumber:
-            (await client.getBlockNumber()) - BigInt(options.finalityLag),
+            (await blockClient.getBlockNumber()) - BigInt(options.finalityLag),
         });
   if (finalizedBlock.number === null)
     throw new Error("RPC returned an unmined finalized block");
@@ -590,7 +593,7 @@ export async function ingestLogs(
   );
   const stored = checkpoint.rows[0];
   if (stored?.last_completed_block && stored.last_completed_block_hash) {
-    const anchor = await client.getBlock({
+    const anchor = await blockClient.getBlock({
       blockNumber: BigInt(stored.last_completed_block),
     });
     if (
@@ -723,7 +726,9 @@ export async function ingestLogs(
           isFinalChunk || (counters.chunks + 1) % anchorEveryChunks === 0;
         const anchor = shouldAnchor
           ? asStoredBlock(
-              await client.getBlock({ blockNumber: fetched.range.toBlock }),
+              await blockClient.getBlock({
+                blockNumber: fetched.range.toBlock,
+              }),
             )
           : undefined;
 

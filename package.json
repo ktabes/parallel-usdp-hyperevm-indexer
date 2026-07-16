@@ -10,6 +10,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "worker:hyperevm-history": "node --import tsx src/workers/hyperevm-history.ts",
     "cli": "node --import tsx src/cli.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --import tsx src/db/migrate.ts",

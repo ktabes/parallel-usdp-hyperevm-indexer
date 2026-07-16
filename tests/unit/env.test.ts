@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseRuntimeEnv } from "@/config/env";
+import { parseHistoryWorkerEnv, parseRuntimeEnv } from "@/config/env";
 
 const validEnvironment = {
   NODE_ENV: "test",
@@ -88,5 +88,36 @@ describe("parseRuntimeEnv", () => {
       parseRuntimeEnv({ ...validEnvironment, ONFINALITY_API_KEY: "" })
         .ONFINALITY_API_KEY,
     ).toBeUndefined();
+  });
+});
+
+describe("parseHistoryWorkerEnv", () => {
+  it("uses safe official-RPC defaults for the dedicated worker", () => {
+    expect(
+      parseHistoryWorkerEnv({
+        ...validEnvironment,
+        HYPEREVM_HISTORY_WINDOW_END: "1784163557",
+      }),
+    ).toMatchObject({
+      HYPEREVM_HISTORY_WINDOW_END: 1_784_163_557n,
+      HYPEREVM_HISTORY_DAYS: 7,
+      HYPEREVM_HISTORY_STATE_RPC_URL: "https://rpc.hyperliquid.xyz/evm",
+      HYPEREVM_HISTORY_FALLBACK_RPC_URL: "https://rpc.hyperliquid.xyz/evm",
+      HYPEREVM_HISTORY_PRIMARY_CHUNK_SIZE: 5,
+      HYPEREVM_HISTORY_FALLBACK_CHUNK_SIZE: 50,
+    });
+  });
+
+  it("rejects a missing pinned window and unsafe provider settings", () => {
+    expect(() => parseHistoryWorkerEnv(validEnvironment)).toThrow(
+      /HYPEREVM_HISTORY_WINDOW_END/,
+    );
+    expect(() =>
+      parseHistoryWorkerEnv({
+        ...validEnvironment,
+        HYPEREVM_HISTORY_WINDOW_END: "1784163557",
+        HYPEREVM_HISTORY_FALLBACK_INTERVAL_MS: "100",
+      }),
+    ).toThrow(/HYPEREVM_HISTORY_FALLBACK_INTERVAL_MS/);
   });
 });

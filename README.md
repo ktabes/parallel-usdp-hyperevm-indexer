@@ -53,6 +53,7 @@ npm run cli -- history-boundaries --days 7
 npm run cli -- history-backfill --chain base --days 7
 npm run cli -- history-backfill --chain ethereum --days 7 --log-rpc-url LOG_RPC_URL
 npm run cli -- history-backfill --chain hyperevm --days 7 --window-end UNIX_TIMESTAMP --log-rpc-url LOG_RPC_URL
+npm run worker:hyperevm-history
 npm run cli -- history-reconcile --chains base,sonic,avalanche
 npm run cli -- lifetime-plan --chains ethereum,base,sonic,avalanche
 npm run cli -- lifetime-backfill --chain base
@@ -77,6 +78,26 @@ npm run test:network
 Network tests are opt-in and require `RUN_NETWORK_TESTS=1` plus a real `HYPEREVM_RPC_URL`. Integration tests run when `TEST_DATABASE_URL` is present and otherwise report as skipped.
 
 The official HyperEVM RPC is the default seven-day log source. It limits `eth_getLogs` to 50-block ranges and approximately 100 requests per minute, so the initial week is a long, resumable one-time job rather than a deployment startup task. Ingestion defaults to one request start every 1,500 ms, applies jittered backoff, retries rate limits indefinitely, and commits each successful range before continuing. The optional `ALCHEMY_API_KEY` provides recent-state reads but is not treated as historical. OnFinality remains optional for strict archive certification. Provider roles are assigned from live capability evidence rather than marketing claims.
+
+For the pinned HyperEVM history window, prefer the dedicated
+`worker:hyperevm-history` process over launching the CLI inside the web
+service. Set `HYPEREVM_HISTORY_WINDOW_END` to the immutable Unix timestamp and
+optionally set `HYPEREVM_HISTORY_PRIMARY_RPC_URL` to a private historical
+provider. The worker keeps state reads and checkpoint-hash verification on
+`HYPEREVM_HISTORY_STATE_RPC_URL`, recognizes a provider's daily request quota
+as distinct from ordinary throttling, and resumes from the same PostgreSQL
+checkpoint through `HYPEREVM_HISTORY_FALLBACK_RPC_URL`. The fallback defaults
+to the official public RPC with 50-block chunks and a 1,500 ms request-start
+interval. Provider URLs are never included in worker progress logs. A
+PostgreSQL advisory lock prevents the web process, CLI, and dedicated worker
+from scanning the same chain/scope together.
+
+For Railway, create a worker service from the same repository with start
+command `npm run worker:hyperevm-history`. Give it `DATABASE_URL`,
+`HYPEREVM_RPC_URL`, and the `HYPEREVM_HISTORY_*` variables, but do not enable
+`RUN_SEVEN_DAY_BACKFILL` on the web service. A successful bounded worker exits
+after flow derivation and YPO reconciliation; a restart safely no-ops from the
+completed checkpoint.
 
 On Railway, set `RUN_SEVEN_DAY_BACKFILL=1` to start the worker beside the web service. A PostgreSQL advisory lock prevents duplicate workers, recoverable RPC failures restart from the durable checkpoint, and `/api/indexer/status` exposes the checkpoint, stored row counts, and recent runs. `RPC_REQUEST_INTERVAL_MS` can tune the pace, but the conservative `1500` default is recommended for the public endpoint. Set the flag back to `0` after the initial week completes if continuous catch-up is not wanted.
 

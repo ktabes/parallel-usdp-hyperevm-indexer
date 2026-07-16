@@ -1,11 +1,13 @@
 import { createPublicClient, defineChain, http, type Transport } from "viem";
 
+export const HYPEREVM_PUBLIC_RPC_URL = "https://rpc.hyperliquid.xyz/evm";
+
 export const hyperevm = defineChain({
   id: 999,
   name: "HyperEVM",
   nativeCurrency: { name: "HYPE", symbol: "HYPE", decimals: 18 },
   rpcUrls: {
-    default: { http: ["https://rpc.hyperliquid.xyz/evm"] },
+    default: { http: [HYPEREVM_PUBLIC_RPC_URL] },
   },
 });
 

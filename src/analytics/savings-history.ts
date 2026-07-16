@@ -9,6 +9,11 @@ import {
 } from "@/protocol/savings-chains";
 import { createEvmClient, type EvmClient } from "@/rpc/evm-client";
 import { findBlockAtOrAfterTimestamp, ingestLogs } from "@/indexer/service";
+import {
+  runWithProviderFailover,
+  type RpcProviderCandidate,
+  type RpcProviderFailoverEvent,
+} from "@/rpc/provider-failover";
 
 export interface AlignedSavingsHistoryRange {
   adapter: SavingsChainAdapter;
@@ -145,7 +150,10 @@ export interface RunSavingsHistoryOptions {
   range: AlignedSavingsHistoryRange;
   chunkSize?: number;
   logRpcUrl?: string;
+  logRpcProviders?: readonly RpcProviderCandidate[];
+  signal?: AbortSignal;
   onProgress?: Parameters<typeof ingestLogs>[0]["onProgress"];
+  onProviderFailover?: (event: RpcProviderFailoverEvent) => void;
 }
 
 export async function runSavingsHistoryRange(
@@ -153,86 +161,130 @@ export async function runSavingsHistoryRange(
 ) {
   const { adapter } = options.range;
   const scope = savingsHistoryScope(options.range);
+  const lock = await options.pool.connect();
+  const lockResult = await lock.query<{ locked: boolean }>(
+    `select pg_try_advisory_lock($1, hashtext($2)) as locked`,
+    [adapter.chainId, scope],
+  );
+  if (!lockResult.rows[0]?.locked) {
+    lock.release();
+    throw new Error(`${adapter.chainName} history worker is already running`);
+  }
 
-  const startSnapshot = await captureSavingsChainSnapshot({
-    pool: options.pool,
-    adapter,
-    rpcUrl: options.range.rpcUrl,
-    finalityLag: options.env.FINALITY_LAG,
-    requestIntervalMs: options.env.RPC_REQUEST_INTERVAL_MS,
-    blockNumber: options.range.fromBlock,
-  });
-  const endSnapshot = await captureSavingsChainSnapshot({
-    pool: options.pool,
-    adapter,
-    rpcUrl: options.range.rpcUrl,
-    finalityLag: options.env.FINALITY_LAG,
-    requestIntervalMs: options.env.RPC_REQUEST_INTERVAL_MS,
-    blockNumber: options.range.toBlock,
-  });
-  if (startSnapshot.status === "invalid" || endSnapshot.status === "invalid")
+  try {
+    const startSnapshot = await captureSavingsChainSnapshot({
+      pool: options.pool,
+      adapter,
+      rpcUrl: options.range.rpcUrl,
+      finalityLag: options.env.FINALITY_LAG,
+      requestIntervalMs: options.env.RPC_REQUEST_INTERVAL_MS,
+      blockNumber: options.range.fromBlock,
+    });
+    const endSnapshot = await captureSavingsChainSnapshot({
+      pool: options.pool,
+      adapter,
+      rpcUrl: options.range.rpcUrl,
+      finalityLag: options.env.FINALITY_LAG,
+      requestIntervalMs: options.env.RPC_REQUEST_INTERVAL_MS,
+      blockNumber: options.range.toBlock,
+    });
+    if (startSnapshot.status === "invalid" || endSnapshot.status === "invalid")
+      return {
+        status: "unavailable" as const,
+        reason: "boundary_snapshot_invalid" as const,
+        chainId: adapter.chainId,
+        chainSlug: adapter.chainSlug,
+        scope,
+        startSnapshot,
+        endSnapshot,
+      };
+
+    const defaultChunkSize =
+      options.chunkSize ?? defaultChunkSizes[adapter.chainId] ?? 2_000;
+    const providers =
+      options.logRpcProviders ??
+      ([
+        {
+          id: "configured",
+          rpcUrl: options.logRpcUrl ?? options.range.rpcUrl,
+          chunkSize: defaultChunkSize,
+          requestIntervalMs: options.env.RPC_REQUEST_INTERVAL_MS,
+        },
+      ] satisfies RpcProviderCandidate[]);
+    const ingestion = await runWithProviderFailover({
+      providers,
+      onFailover: options.onProviderFailover,
+      operation: (provider) =>
+        ingestLogs({
+          pool: options.pool,
+          rpcUrl: provider.rpcUrl,
+          blockRpcUrl: options.range.rpcUrl,
+          adapter,
+          addresses: [adapter.susdp.address],
+          fromBlock: options.range.fromBlock,
+          toBlock: options.range.toBlock,
+          finalityLag: options.env.FINALITY_LAG,
+          chunkSize: provider.chunkSize,
+          scope,
+          requestIntervalMs: provider.requestIntervalMs,
+          maxRetries: 5,
+          retryRateLimitsIndefinitely: false,
+          anchorEveryChunks: 100,
+          fetchConcurrency: 1,
+          signal: options.signal,
+          onProgress: options.onProgress,
+        }),
+    });
+    if (ingestion.status === "interrupted")
+      return {
+        status: "interrupted" as const,
+        chainId: adapter.chainId,
+        chainSlug: adapter.chainSlug,
+        scope,
+        ingestion,
+      };
+    const flows = await rebuildFlowAnalytics({
+      pool: options.pool,
+      chainId: adapter.chainId,
+      scope,
+      fromBlock: options.range.fromBlock,
+      toBlock: options.range.toBlock,
+      manifestVersion: adapter.manifestVersion,
+    });
+    const yieldResult = await calculateSavingsYieldForRange({
+      pool: options.pool,
+      adapter,
+      scope,
+      fromBlock: options.range.fromBlock,
+      toBlock: options.range.toBlock,
+    });
     return {
-      status: "unavailable" as const,
-      reason: "boundary_snapshot_invalid" as const,
+      status:
+        flows.status === "candidate" && yieldResult.status === "candidate"
+          ? ("candidate" as const)
+          : ("unavailable" as const),
       chainId: adapter.chainId,
       chainSlug: adapter.chainSlug,
       scope,
+      range: {
+        fromBlock: options.range.fromBlock.toString(),
+        toBlock: options.range.toBlock.toString(),
+        fromTimestamp: options.range.fromTimestamp.toString(),
+        toTimestamp: options.range.toTimestamp.toString(),
+        targetWindowStart: options.range.targetWindowStart.toString(),
+        targetWindowEnd: options.range.targetWindowEnd.toString(),
+      },
       startSnapshot,
       endSnapshot,
+      ingestion,
+      flows,
+      yield: yieldResult,
     };
-
-  const ingestion = await ingestLogs({
-    pool: options.pool,
-    rpcUrl: options.logRpcUrl ?? options.range.rpcUrl,
-    adapter,
-    addresses: [adapter.susdp.address],
-    fromBlock: options.range.fromBlock,
-    toBlock: options.range.toBlock,
-    finalityLag: options.env.FINALITY_LAG,
-    chunkSize: options.chunkSize ?? defaultChunkSizes[adapter.chainId] ?? 2_000,
-    scope,
-    requestIntervalMs: options.env.RPC_REQUEST_INTERVAL_MS,
-    maxRetries: 5,
-    retryRateLimitsIndefinitely: false,
-    anchorEveryChunks: 100,
-    fetchConcurrency: 1,
-    onProgress: options.onProgress,
-  });
-  const flows = await rebuildFlowAnalytics({
-    pool: options.pool,
-    chainId: adapter.chainId,
-    scope,
-    fromBlock: options.range.fromBlock,
-    toBlock: options.range.toBlock,
-    manifestVersion: adapter.manifestVersion,
-  });
-  const yieldResult = await calculateSavingsYieldForRange({
-    pool: options.pool,
-    adapter,
-    scope,
-    fromBlock: options.range.fromBlock,
-    toBlock: options.range.toBlock,
-  });
-  return {
-    status:
-      flows.status === "candidate" && yieldResult.status === "candidate"
-        ? ("candidate" as const)
-        : ("unavailable" as const),
-    chainId: adapter.chainId,
-    chainSlug: adapter.chainSlug,
-    scope,
-    range: {
-      fromBlock: options.range.fromBlock.toString(),
-      toBlock: options.range.toBlock.toString(),
-      fromTimestamp: options.range.fromTimestamp.toString(),
-      toTimestamp: options.range.toTimestamp.toString(),
-      targetWindowStart: options.range.targetWindowStart.toString(),
-      targetWindowEnd: options.range.targetWindowEnd.toString(),
-    },
-    startSnapshot,
-    endSnapshot,
-    ingestion,
-    flows,
-    yield: yieldResult,
-  };
+  } finally {
+    await lock.query(`select pg_advisory_unlock($1, hashtext($2))`, [
+      adapter.chainId,
+      scope,
+    ]);
+    lock.release();
+  }
 }

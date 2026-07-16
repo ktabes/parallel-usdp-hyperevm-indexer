@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { HYPEREVM_PUBLIC_RPC_URL } from "@/rpc/hyperevm-client";
 
 const integerFromString = (name: string, minimum: number, maximum: number) =>
   z.coerce
@@ -69,6 +70,54 @@ export const runtimeEnvSchema = z.object({
 
 export type RuntimeEnv = z.infer<typeof runtimeEnvSchema>;
 
+const positiveUnixTimestamp = z
+  .string()
+  .regex(/^\d+$/, "HYPEREVM_HISTORY_WINDOW_END must be a Unix timestamp")
+  .transform((value) => BigInt(value))
+  .refine((value) => value > 0n, {
+    message: "HYPEREVM_HISTORY_WINDOW_END must be positive",
+  });
+
+export const historyWorkerEnvSchema = runtimeEnvSchema.extend({
+  HYPEREVM_HISTORY_WINDOW_END: positiveUnixTimestamp,
+  HYPEREVM_HISTORY_DAYS: integerFromString(
+    "HYPEREVM_HISTORY_DAYS",
+    1,
+    365,
+  ).default(7),
+  HYPEREVM_HISTORY_STATE_RPC_URL: z
+    .url("HYPEREVM_HISTORY_STATE_RPC_URL must be a valid URL")
+    .default(HYPEREVM_PUBLIC_RPC_URL),
+  HYPEREVM_HISTORY_PRIMARY_RPC_URL: optionalUrl(
+    "HYPEREVM_HISTORY_PRIMARY_RPC_URL",
+  ),
+  HYPEREVM_HISTORY_FALLBACK_RPC_URL: z
+    .url("HYPEREVM_HISTORY_FALLBACK_RPC_URL must be a valid URL")
+    .default(HYPEREVM_PUBLIC_RPC_URL),
+  HYPEREVM_HISTORY_PRIMARY_CHUNK_SIZE: integerFromString(
+    "HYPEREVM_HISTORY_PRIMARY_CHUNK_SIZE",
+    1,
+    100_000,
+  ).default(5),
+  HYPEREVM_HISTORY_FALLBACK_CHUNK_SIZE: integerFromString(
+    "HYPEREVM_HISTORY_FALLBACK_CHUNK_SIZE",
+    1,
+    100_000,
+  ).default(50),
+  HYPEREVM_HISTORY_PRIMARY_INTERVAL_MS: integerFromString(
+    "HYPEREVM_HISTORY_PRIMARY_INTERVAL_MS",
+    250,
+    60_000,
+  ).default(250),
+  HYPEREVM_HISTORY_FALLBACK_INTERVAL_MS: integerFromString(
+    "HYPEREVM_HISTORY_FALLBACK_INTERVAL_MS",
+    250,
+    60_000,
+  ).default(1_500),
+});
+
+export type HistoryWorkerEnv = z.infer<typeof historyWorkerEnvSchema>;
+
 export const discoveryEnvSchema = runtimeEnvSchema.pick({
   HYPEREVM_RPC_URL: true,
   ALCHEMY_API_KEY: true,
@@ -92,6 +141,19 @@ export function parseRuntimeEnv(
     throw new Error(`Invalid runtime configuration: ${issues}`);
   }
 
+  return result.data;
+}
+
+export function parseHistoryWorkerEnv(
+  input: NodeJS.ProcessEnv | Record<string, string | undefined>,
+): HistoryWorkerEnv {
+  const result = historyWorkerEnvSchema.safeParse(input);
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+      .join("; ");
+    throw new Error(`Invalid history worker configuration: ${issues}`);
+  }
   return result.data;
 }
 

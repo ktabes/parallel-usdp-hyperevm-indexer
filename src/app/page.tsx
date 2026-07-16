@@ -19,13 +19,7 @@ const chainColors: Record<string, string> = {
   avalanche: "#e84142",
 };
 
-function AssetLogo({
-  asset,
-  size,
-}: {
-  asset: "usdp" | "susdp";
-  size: number;
-}) {
+function AssetLogo({ asset, size }: { asset: "usdp" | "susdp"; size: number }) {
   const symbol = asset === "usdp" ? "USDp" : "sUSDp";
 
   return (
