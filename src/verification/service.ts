@@ -22,6 +22,7 @@ const ZERO_IMPLEMENTATION = ZERO_ADDRESS;
 
 interface BoundarySnapshotRow {
   block_number: string;
+  block_hash: string;
   block_timestamp: Date;
   usdp_total_supply: string;
   susdp_total_supply: string;
@@ -73,7 +74,7 @@ async function readBoundarySnapshots(
 ) {
   const result = await pool.query<BoundarySnapshotRow>(
     `select distinct on (scs.block_number)
-            scs.block_number, scs.block_timestamp,
+            scs.block_number, scs.block_hash, scs.block_timestamp,
             usdp.total_supply as usdp_total_supply,
             susdp.total_supply as susdp_total_supply,
             scs.susdp_total_assets, scs.susdp_actual_assets,
@@ -355,6 +356,7 @@ export async function runVerificationSuite(
     eventTotals,
     directUnderlyingNet,
     coverage,
+    lifetimeCoverage,
     checkpoint,
     decodeFailureCount,
     duplicateLogCount,
@@ -384,6 +386,13 @@ export async function runVerificationSuite(
     verifyCoverage(
       options.pool,
       options.scope,
+      options.fromBlock,
+      options.toBlock,
+      options.adapter.chainId,
+    ),
+    verifyCoverage(
+      options.pool,
+      `parallel-assets-${options.adapter.chainSlug}-lifetime-v1`,
       options.fromBlock,
       options.toBlock,
       options.adapter.chainId,
@@ -466,13 +475,36 @@ export async function runVerificationSuite(
       const client = createEvmClient(options.adapter.chain, options.rpcUrl, {
         retryCount: 1,
       });
-      convertedTotalSupplyAssets = (await client.readContract({
-        address: options.adapter.susdp.address,
-        abi: savingsAbi,
-        functionName: "convertToAssets",
-        args: [BigInt(end.susdp_total_supply)],
-        blockNumber: options.toBlock,
-      } as never)) as bigint;
+      const [block, rpcTotalSupply, rpcTotalAssets, rpcConvertedAssets] =
+        await Promise.all([
+          client.getBlock({ blockNumber: options.toBlock }),
+          client.readContract({
+            address: options.adapter.susdp.address,
+            abi: savingsAbi,
+            functionName: "totalSupply",
+            blockNumber: options.toBlock,
+          } as never) as Promise<bigint>,
+          client.readContract({
+            address: options.adapter.susdp.address,
+            abi: savingsAbi,
+            functionName: "totalAssets",
+            blockNumber: options.toBlock,
+          } as never) as Promise<bigint>,
+          client.readContract({
+            address: options.adapter.susdp.address,
+            abi: savingsAbi,
+            functionName: "convertToAssets",
+            args: [BigInt(end.susdp_total_supply)],
+            blockNumber: options.toBlock,
+          } as never) as Promise<bigint>,
+        ]);
+      const historicalStateMatchesSnapshot =
+        block.hash?.toLowerCase() === end.block_hash.toLowerCase() &&
+        rpcTotalSupply === BigInt(end.susdp_total_supply) &&
+        rpcTotalAssets === BigInt(end.susdp_total_assets);
+      convertedTotalSupplyAssets = historicalStateMatchesSnapshot
+        ? rpcConvertedAssets
+        : undefined;
     } catch {
       convertedTotalSupplyAssets = undefined;
     }
@@ -512,18 +544,32 @@ export async function runVerificationSuite(
   const results = evaluateCoreReconciliations({
     startUsdpSupply: optionalBigint(start?.usdp_total_supply),
     endUsdpSupply: optionalBigint(end?.usdp_total_supply),
-    usdpMinted: optionalBigint(totals?.usdp_minted),
-    usdpBurned: optionalBigint(totals?.usdp_burned),
+    usdpMinted: lifetimeCoverage.complete
+      ? optionalBigint(totals?.usdp_minted)
+      : undefined,
+    usdpBurned: lifetimeCoverage.complete
+      ? optionalBigint(totals?.usdp_burned)
+      : undefined,
     startSusdpSupply: optionalBigint(start?.susdp_total_supply),
     endSusdpSupply: optionalBigint(end?.susdp_total_supply),
-    susdpMinted: optionalBigint(totals?.susdp_minted),
-    susdpBurned: optionalBigint(totals?.susdp_burned),
+    susdpMinted: coverage.complete
+      ? optionalBigint(totals?.susdp_minted)
+      : undefined,
+    susdpBurned: coverage.complete
+      ? optionalBigint(totals?.susdp_burned)
+      : undefined,
     startActualAssets: optionalBigint(start?.susdp_actual_assets),
     endActualAssets: optionalBigint(end?.susdp_actual_assets),
-    depositedAssets: optionalBigint(totals?.deposited_assets),
-    withdrawnAssets: optionalBigint(totals?.withdrawn_assets),
-    accruedAssets: optionalBigint(totals?.accrued_assets),
-    directUnderlyingNet,
+    depositedAssets: coverage.complete
+      ? optionalBigint(totals?.deposited_assets)
+      : undefined,
+    withdrawnAssets: coverage.complete
+      ? optionalBigint(totals?.withdrawn_assets)
+      : undefined,
+    accruedAssets: coverage.complete
+      ? optionalBigint(totals?.accrued_assets)
+      : undefined,
+    directUnderlyingNet: coverage.complete ? directUnderlyingNet : undefined,
     convertedTotalSupplyAssets,
     endTotalAssets: optionalBigint(end?.susdp_total_assets),
     holderBalanceSum: undefined,
