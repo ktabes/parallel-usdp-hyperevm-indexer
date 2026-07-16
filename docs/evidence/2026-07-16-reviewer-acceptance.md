@@ -4,7 +4,7 @@
 
 - Public deployment: <https://content-spirit-production-5efa.up.railway.app>
 - Reviewer command: `npm run reviewer:proof`
-- Evidence cutoff: `2026-07-16T16:26:03Z`
+- Evidence cutoff: `2026-07-16T20:37:52Z`
 - Lifetime history: complete on Ethereum, Base, Sonic, and Avalanche
 - Aligned seven-day YPO: complete and verified on all five sUSDp chains
 
@@ -21,12 +21,36 @@ database URL, Railway access, or wallet.
 | Five-chain aligned seven-day YPO   | Pass   | Five verified components; no missing/unreconciled chains; zero reconciliation deltas          |
 | StableWatch integration projection | Pass   | Versioned current state, lifetime detail, YPO, and trust data renderable                      |
 
-The accepted 24-chain USDp snapshot at `2026-07-16T16:06:44.303Z` reported
-`2002447001272243447105794` base units, 24 of 24 components, and 1,610 seconds
+The accepted 24-chain USDp snapshot at `2026-07-16T20:37:22.980Z` reported
+`1994920712333108656105873` base units, 24 of 24 components, and 1,710 seconds
 of component skew inside the 1,800-second alignment limit. The value remains
 an accounting `candidate`: it proves aligned contract supply, while promotion
 to verified omnichain circulating supply still requires LayerZero peer and
 message-lifecycle reconciliation.
+
+## Current-state reliability regression
+
+A production audit found that the original 24-chain reader could remain inside
+one process for more than 30 minutes while retrying public RPCs. A late BNB
+component then became the alignment anchor, causing 23 earlier components to be
+excluded and exposing a partial `0.88 USDp` sum as if it were global supply.
+
+The corrected reader now:
+
+- starts all 24 independent chain reads concurrently;
+- bounds each current-state RPC attempt and retries failed public endpoints on
+  the next 30-second cycle rather than extending one observation indefinitely;
+- prefers the responsive official BNB endpoints before the generic fallback;
+- measures every component against the fixed observation timestamp, including
+  rejecting blocks captured too far in the future; and
+- withholds incomplete global supply from the StableWatch projection and
+  dashboard, so an incomplete set renders as unavailable instead of producing
+  an impossible vault-capture percentage.
+
+The first corrected production cycle finished in 5.9 seconds with 23/24 chains
+after one transient Sei failure and failed closed. The next two cycles finished
+in 7.7 and 6.3 seconds with complete 24/24 coverage. The final public reviewer
+proof then passed every gate.
 
 ## Lifetime USDp and sUSDp evidence
 
@@ -83,6 +107,19 @@ refreshes every 60 seconds. Completed backfill data therefore publishes without
 a frontend deploy or manual variable change. HyperEVM remains explicitly
 identified as a fixed seven-day history; the other four chains expose lifetime
 activity plus the aligned seven-day YPO interval.
+
+## Final public UI audit
+
+- The live dashboard renders the complete `1,994,920.71 USDp` global supply and
+  a coherent `15.58%` share vaulted into sUSDp.
+- Desktop overview, asset fundamentals, chain distributions, lifetime activity,
+  YPO, and methodology render without missing sections or overflow.
+- Ethereum, Base, Sonic, HyperEVM, and Avalanche detail routes all return their
+  chain identity, current metrics, correctly scoped history, and provenance;
+  lifetime holder ledgers remain exclusive to the four lifetime-backed chains.
+- Responsive breakpoints collapse dashboard cards, asset distributions,
+  methodology rows, and chain-detail grids to one column at 720px; wide evidence
+  tables retain horizontal scrolling instead of overflowing the viewport.
 
 ## Reproduction
 
