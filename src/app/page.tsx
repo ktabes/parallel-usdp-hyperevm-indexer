@@ -168,6 +168,29 @@ function shareOf(value: string | bigint, total: string | bigint) {
   return Number((numerator * 100_000n) / denominator) / 1_000;
 }
 
+function distributionGradient(
+  components: Array<{ chainSlug: string; value: string }>,
+) {
+  const total = components.reduce(
+    (sum, component) => sum + BigInt(component.value),
+    0n,
+  );
+  if (total === 0n) return "#242a24";
+  let cursor = 0;
+  return `conic-gradient(${components
+    .map((component, index) => {
+      const start = cursor;
+      const end =
+        index === components.length - 1
+          ? 100
+          : start +
+            Number((BigInt(component.value) * 100_000n) / total) / 1_000;
+      cursor = end;
+      return `${chainColors[component.chainSlug] ?? "#c9ff4b"} ${start.toFixed(3)}% ${end.toFixed(3)}%`;
+    })
+    .join(", ")})`;
+}
+
 function price(value: string | null) {
   if (value === null) return "—";
   const amount = Number(value) / 1e18;
@@ -294,6 +317,18 @@ export default async function Home() {
   );
   const hyperevmHistory = data.detail.chainBreakdown.find(
     (chain) => chain.chainSlug === "hyperevm",
+  );
+  const usdpDistributionGradient = distributionGradient(
+    data.detail.chainBreakdown.map((chain) => ({
+      chainSlug: chain.chainSlug,
+      value: chain.usdpTotalSupply,
+    })),
+  );
+  const susdpTvlDistributionGradient = distributionGradient(
+    data.detail.chainBreakdown.map((chain) => ({
+      chainSlug: chain.chainSlug,
+      value: chain.susdpTotalAssets,
+    })),
   );
 
   return (
@@ -666,6 +701,47 @@ export default async function Home() {
                 </div>
                 <span>Underlying asset</span>
               </div>
+              <div className="asset-distribution">
+                <div
+                  className="distribution-donut"
+                  style={{ background: usdpDistributionGradient }}
+                  role="img"
+                  aria-label="USDp supply distribution across five savings chains"
+                >
+                  <span>
+                    <strong>USDp</strong>
+                    <small>5 chains</small>
+                  </span>
+                </div>
+                <div className="asset-distribution-copy">
+                  <small>Supply distribution</small>
+                  <strong>
+                    {decimal(savingsSupply.toString(), 18, 2)} USDp observed
+                  </strong>
+                  <p>
+                    Each segment represents a chain&apos;s share of USDp supply
+                    across the five sUSDp-enabled networks.
+                  </p>
+                </div>
+                <div className="asset-distribution-legend">
+                  {data.detail.chainBreakdown.map((chain) => (
+                    <div key={chain.chainId}>
+                      <i
+                        style={{
+                          background: chainColors[chain.chainSlug] ?? "#c9ff4b",
+                        }}
+                      />
+                      <span>{chain.chainName}</span>
+                      <strong>
+                        {shareOf(chain.usdpTotalSupply, savingsSupply).toFixed(
+                          2,
+                        )}
+                        %
+                      </strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
               <div className="chain-table-wrap">
                 <table className="chain-table usdp-chain-table">
                   <thead>
@@ -751,6 +827,45 @@ export default async function Home() {
                   <h2>Savings supply, TVL, and yield by chain</h2>
                 </div>
                 <span>Yield-bearing share</span>
+              </div>
+              <div className="asset-distribution">
+                <div
+                  className="distribution-donut"
+                  style={{ background: susdpTvlDistributionGradient }}
+                  role="img"
+                  aria-label="sUSDp vault TVL distribution across five chains"
+                >
+                  <span>
+                    <strong>sUSDp</strong>
+                    <small>TVL</small>
+                  </span>
+                </div>
+                <div className="asset-distribution-copy">
+                  <small>Vault TVL distribution</small>
+                  <strong>{decimal(totalAssets.toString(), 18, 2)} USDp</strong>
+                  <p>
+                    Each segment represents the USDp assets held by sUSDp vaults
+                    on that chain.
+                  </p>
+                </div>
+                <div className="asset-distribution-legend">
+                  {data.detail.chainBreakdown.map((chain) => (
+                    <div key={chain.chainId}>
+                      <i
+                        style={{
+                          background: chainColors[chain.chainSlug] ?? "#c9ff4b",
+                        }}
+                      />
+                      <span>{chain.chainName}</span>
+                      <strong>
+                        {shareOf(chain.susdpTotalAssets, totalAssets).toFixed(
+                          2,
+                        )}
+                        %
+                      </strong>
+                    </div>
+                  ))}
+                </div>
               </div>
               <div className="chain-table-wrap">
                 <table className="chain-table susdp-chain-table">

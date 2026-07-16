@@ -1038,6 +1038,93 @@ h1 span {
   color: #7f8880;
   font-size: 0.58rem;
 }
+.asset-distribution {
+  display: grid;
+  grid-template-columns: 156px minmax(220px, 0.85fr) minmax(320px, 1.15fr);
+  align-items: center;
+  gap: 30px;
+  margin-bottom: 26px;
+  padding: 24px;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: #101010;
+}
+.distribution-donut {
+  width: 148px;
+  height: 148px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  box-shadow: 0 0 24px rgb(151 252 228 / 5%);
+}
+.distribution-donut > span {
+  width: 86px;
+  height: 86px;
+  display: grid;
+  place-content: center;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: #0c0c0c;
+  text-align: center;
+}
+.distribution-donut strong,
+.distribution-donut small {
+  display: block;
+}
+.distribution-donut strong {
+  color: #eef1ed;
+  font-size: 0.72rem;
+}
+.distribution-donut small {
+  color: #727b73;
+  font-size: 0.55rem;
+}
+.asset-distribution-copy small,
+.asset-distribution-copy strong {
+  display: block;
+}
+.asset-distribution-copy small {
+  color: var(--blue);
+  font-size: 0.58rem;
+}
+.asset-distribution-copy strong {
+  margin-top: 8px;
+  color: #edf0eb;
+  font-size: 1.1rem;
+  letter-spacing: -0.025em;
+}
+.asset-distribution-copy p {
+  max-width: 410px;
+  margin: 9px 0 0;
+  color: #707971;
+  font-size: 0.62rem;
+  line-height: 1.55;
+}
+.asset-distribution-legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(130px, 1fr));
+  gap: 12px 22px;
+}
+.asset-distribution-legend > div {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.62rem;
+}
+.asset-distribution-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.asset-distribution-legend span {
+  color: #8d968e;
+}
+.asset-distribution-legend strong {
+  color: #dce1db;
+  font-size: 0.64rem;
+}
 .section-heading {
   display: flex;
   align-items: flex-end;
@@ -1887,6 +1974,12 @@ footer > div:last-child {
   .yield-layout {
     grid-template-columns: 1fr;
   }
+  .asset-distribution {
+    grid-template-columns: 156px 1fr;
+  }
+  .asset-distribution-legend {
+    grid-column: 1 / -1;
+  }
   .lifetime-summary {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -2012,6 +2105,20 @@ footer > div:last-child {
   .asset-chain-panel-heading > span {
     grid-column: 2;
     justify-self: start;
+  }
+  .asset-distribution {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+  .asset-distribution-copy p {
+    margin-right: auto;
+    margin-left: auto;
+  }
+  .asset-distribution-legend {
+    grid-column: auto;
+    width: 100%;
+    text-align: left;
   }
   .trust-grid {
     grid-template-columns: 1fr;
