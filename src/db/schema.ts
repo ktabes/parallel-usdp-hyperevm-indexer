@@ -390,6 +390,8 @@ export const assetDeployments = pgTable(
     chainSlug: text("chain_slug").notNull(),
     chainName: text("chain_name").notNull(),
     contractAddress: text("contract_address").notNull(),
+    deploymentBlock: bigint("deployment_block", { mode: "bigint" }),
+    deploymentBlockSource: text("deployment_block_source"),
     deploymentTier: text("deployment_tier").notNull(),
     adapterStatus: text("adapter_status").notNull(),
     officialSource: text("official_source").notNull(),
@@ -422,6 +424,11 @@ export const assetDeployments = pgTable(
     check(
       "asset_deployments_address_check",
       sql`${table.contractAddress} ~ '^0x[0-9a-f]{40}$'`,
+    ),
+    check(
+      "asset_deployments_block_source_check",
+      sql`(${table.deploymentBlock} is null and ${table.deploymentBlockSource} is null)
+        or (${table.deploymentBlock} >= 0 and ${table.deploymentBlockSource} is not null)`,
     ),
   ],
 );

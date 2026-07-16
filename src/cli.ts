@@ -20,6 +20,13 @@ import {
   runSavingsHistoryRange,
 } from "@/analytics/savings-history";
 import { reconcileLatestSavingsYield } from "@/analytics/yield-reconciliation";
+import {
+  lifetimeActivityRequestCount,
+  lifetimeActivityScope,
+  lifetimeChunkSizes,
+  resolveLifetimeActivityRanges,
+  runLifetimeActivityRange,
+} from "@/analytics/lifetime-activity";
 import { savingsChainAdapters } from "@/protocol/savings-chains";
 import { createDatabase } from "@/db/client";
 import {
@@ -489,6 +496,98 @@ async function backfillSavingsHistory() {
   }
 }
 
+function optionalChunkSize() {
+  const value = argument("--chunk-size");
+  if (value === undefined) return undefined;
+  const chunkSize = Number(value);
+  if (!Number.isInteger(chunkSize) || chunkSize < 1 || chunkSize > 100_000)
+    throw new Error("--chunk-size must be an integer from 1 to 100000");
+  return chunkSize;
+}
+
+async function showLifetimeActivityPlan() {
+  const env = parseRuntimeEnv(process.env);
+  const ranges = await resolveLifetimeActivityRanges(
+    env,
+    requestedHistoryChains(),
+  );
+  const requestedChunkSize = optionalChunkSize();
+  console.log(
+    JSON.stringify(
+      {
+        status: "planned",
+        assets: ["usdp", "susdp"],
+        ranges: ranges.map((range) => {
+          const chunkSize =
+            requestedChunkSize ??
+            lifetimeChunkSizes[range.adapter.chainId] ??
+            2_000;
+          return {
+            chainId: range.adapter.chainId,
+            chainSlug: range.adapter.chainSlug,
+            fromBlock: range.fromBlock.toString(),
+            toBlock: range.toBlock.toString(),
+            blockCount: (range.toBlock - range.fromBlock + 1n).toString(),
+            chunkSize,
+            estimatedLogRequests: lifetimeActivityRequestCount(
+              range.fromBlock,
+              range.toBlock,
+              chunkSize,
+            ).toString(),
+            scope: lifetimeActivityScope(range.adapter),
+          };
+        }),
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+async function backfillLifetimeActivity() {
+  const env = parseRuntimeEnv(process.env);
+  const ranges = await resolveLifetimeActivityRanges(
+    env,
+    requestedHistoryChains(),
+  );
+  const { pool } = createDatabase(env);
+  const controller = new AbortController();
+  const interrupt = () => controller.abort();
+  process.once("SIGINT", interrupt);
+  process.once("SIGTERM", interrupt);
+  try {
+    await syncParallelAssetRegistry(pool);
+    for (const range of ranges) {
+      console.log(
+        JSON.stringify({
+          status: "chain-started",
+          assets: ["usdp", "susdp"],
+          chainId: range.adapter.chainId,
+          chainSlug: range.adapter.chainSlug,
+          fromBlock: range.fromBlock.toString(),
+          toBlock: range.toBlock.toString(),
+          scope: lifetimeActivityScope(range.adapter),
+        }),
+      );
+      const result = await runLifetimeActivityRange({
+        pool,
+        env,
+        range,
+        chunkSize: optionalChunkSize(),
+        logRpcUrl: argument("--log-rpc-url"),
+        signal: controller.signal,
+        onProgress: progressReporter(),
+      });
+      console.log(JSON.stringify(result, null, 2));
+      if (result.status === "interrupted") break;
+    }
+  } finally {
+    process.removeListener("SIGINT", interrupt);
+    process.removeListener("SIGTERM", interrupt);
+    await pool.end();
+  }
+}
+
 async function reconcileSavingsHistory() {
   const env = parseRuntimeEnv(process.env);
   const requested = new Set(requestedHistoryChains());
@@ -629,6 +728,12 @@ async function main() {
     case "history-reconcile":
       await reconcileSavingsHistory();
       return;
+    case "lifetime-plan":
+      await showLifetimeActivityPlan();
+      return;
+    case "lifetime-backfill":
+      await backfillLifetimeActivity();
+      return;
     case "calculate-yield":
       await calculateYield();
       return;
@@ -646,7 +751,7 @@ async function main() {
       return;
     default:
       throw new Error(
-        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|derive-flows|snapshot|snapshot-all|history-plan|history-boundaries|history-backfill|history-reconcile|calculate-yield|state|yield|rates|price|global|history>",
+        "Usage: npm run cli -- <config-check|db-ping|discover|preflight|backfill|seven-day-backfill|sync|status|verify-coverage|derive-flows|snapshot|snapshot-all|history-plan|history-boundaries|history-backfill|history-reconcile|lifetime-plan|lifetime-backfill|calculate-yield|state|yield|rates|price|global|history>",
       );
   }
 }

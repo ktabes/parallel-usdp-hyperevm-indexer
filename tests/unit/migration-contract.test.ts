@@ -109,4 +109,14 @@ describe("initial migration contract", () => {
       'CREATE UNIQUE INDEX "global_savings_yield_component_chain_unique"',
     );
   });
+
+  it("persists auditable asset deployment boundaries", async () => {
+    const migration = await readFile("drizzle/0006_cooing_maestro.sql", "utf8");
+
+    expect(migration).toContain('ADD COLUMN "deployment_block" bigint');
+    expect(migration).toContain('ADD COLUMN "deployment_block_source" text');
+    expect(migration).toContain(
+      'CONSTRAINT "asset_deployments_block_source_check"',
+    );
+  });
 });

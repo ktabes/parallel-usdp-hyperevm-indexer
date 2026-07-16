@@ -12,6 +12,8 @@ export interface ParallelChainDeployment {
   address: Address;
   tier: ParallelChainTier;
   adapterStatus: AdapterStatus;
+  deploymentBlock?: bigint;
+  deploymentBlockSource?: string;
 }
 
 const officialProductSource =
@@ -25,6 +27,8 @@ const usdp = (
   chainName: string,
   value: string,
   tier: ParallelChainTier,
+  deploymentBlock?: bigint,
+  deploymentBlockSource?: string,
 ): ParallelChainDeployment => ({
   assetId: "usdp",
   chainId,
@@ -33,6 +37,8 @@ const usdp = (
   address: address(value),
   tier,
   adapterStatus: chainId === 999 ? "verified" : "planned",
+  deploymentBlock,
+  deploymentBlockSource,
 });
 
 const susdp = (
@@ -40,6 +46,8 @@ const susdp = (
   chainSlug: string,
   chainName: string,
   value: string,
+  deploymentBlock: bigint,
+  deploymentBlockSource: string,
 ): ParallelChainDeployment => ({
   assetId: "susdp",
   chainId,
@@ -48,6 +56,8 @@ const susdp = (
   address: address(value),
   tier: "savings",
   adapterStatus: chainId === 999 ? "verified" : "planned",
+  deploymentBlock,
+  deploymentBlockSource,
 });
 
 /**
@@ -64,6 +74,8 @@ export const usdpDeployments = [
     "Ethereum",
     "0x9B3a8f7CEC208e247d97dEE13313690977e24459",
     "savings",
+    22_639_007n,
+    "https://etherscan.io/tx/0xbaa7c9871e325411a256648d346d0324ca3b9871fe8e9bddb224e9b03b9d9072",
   ),
   usdp(
     8453,
@@ -71,6 +83,8 @@ export const usdpDeployments = [
     "Base",
     "0x76A9A0062ec6712b99B4f63bD2b4270185759dd5",
     "savings",
+    31_200_853n,
+    "rpc:base:eth_getCode-boundary",
   ),
   usdp(
     146,
@@ -78,6 +92,8 @@ export const usdpDeployments = [
     "Sonic",
     "0x08417cdb7F52a5021bB4eb6E0deAf3f295c3f182",
     "savings",
+    32_199_398n,
+    "rpc:sonic:eth_getCode-boundary",
   ),
   usdp(
     999,
@@ -85,6 +101,8 @@ export const usdpDeployments = [
     "HyperEVM",
     "0xbe65f0f410a72bec163dc65d46c83699e957d588",
     "savings",
+    5_035_286n,
+    "https://hyperevmscan.io/tx/0x915212321e7364fe67bb474b74698b91e0bcf62d20f2537c862bd3523eb5c9ae",
   ),
   usdp(
     43114,
@@ -92,6 +110,8 @@ export const usdpDeployments = [
     "Avalanche",
     "0x9eE1963f05553eF838604Dd39403be21ceF26AA4",
     "savings",
+    63_383_232n,
+    "https://snowscan.xyz/tx/0xd1dfc75ab045142c6047ac8daa5b3e97df3c218a4e68db40d00195234a88c9ea",
   ),
   usdp(
     137,
@@ -234,20 +254,40 @@ export const susdpDeployments = [
     "ethereum",
     "Ethereum",
     "0x0d45b129dc868963025db79a9074ea9c9e32cae4",
+    22_816_779n,
+    "https://etherscan.io/tx/0x36a8c622a2d4773ff6b71c219d789762420aaa3e5171b61d7a24a9f34b2790fd",
   ),
-  susdp(8453, "base", "Base", "0x472ed57b376fe400259fb28e5c46eb53f0e3e7e7"),
-  susdp(146, "sonic", "Sonic", "0xe8a3da6f5ed1cf04c58ac7f6a7383641e877517b"),
+  susdp(
+    8453,
+    "base",
+    "Base",
+    "0x472ed57b376fe400259fb28e5c46eb53f0e3e7e7",
+    32_247_463n,
+    "rpc:base:eth_getCode-boundary",
+  ),
+  susdp(
+    146,
+    "sonic",
+    "Sonic",
+    "0xe8a3da6f5ed1cf04c58ac7f6a7383641e877517b",
+    36_579_532n,
+    "rpc:sonic:eth_getCode-boundary",
+  ),
   susdp(
     999,
     "hyperevm",
     "HyperEVM",
     "0x9b3a8f7cec208e247d97dee13313690977e24459",
+    5_119_222n,
+    "https://hyperevmscan.io/tx/0x55649f4f27ce66b3c335347fe1b7fdf4ecd1eccbb1d3b134d6cf789e19a8d40b",
   ),
   susdp(
     43114,
     "avalanche",
     "Avalanche",
     "0x9d92c21205383651610f90722131655a5b8ed3e0",
+    68_411_905n,
+    "https://snowscan.xyz/tx/0x6bafd70d260ad18515c0a29772f51d2249c80e8a2f42d4d307c703a42e456553",
   ),
 ] as const;
 

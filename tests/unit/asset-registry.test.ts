@@ -34,6 +34,16 @@ describe("Parallel cross-chain asset registry", () => {
     }
   });
 
+  it("records an auditable deployment boundary for every savings asset", () => {
+    for (const deployment of [...susdpDeployments]) {
+      const usdp = findParallelDeployment("usdp", deployment.chainId);
+      expect(usdp?.deploymentBlock).toBeGreaterThan(0n);
+      expect(usdp?.deploymentBlockSource).toBeTruthy();
+      expect(deployment.deploymentBlock).toBeGreaterThan(0n);
+      expect(deployment.deploymentBlockSource).toBeTruthy();
+    }
+  });
+
   it("preserves HyperEVM as the first verified chain adapter", () => {
     const usdp = findParallelDeployment("usdp", hyperevmProtocol.chainId);
     const susdp = findParallelDeployment("susdp", hyperevmProtocol.chainId);

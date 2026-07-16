@@ -65,12 +65,15 @@ export async function syncParallelAssetRegistry(pool: Pool) {
       await database.query(
         `insert into asset_deployments
           (asset_id, chain_id, chain_slug, chain_name, contract_address,
-           deployment_tier, adapter_status, official_source, source_checked_at)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+           deployment_block, deployment_block_source, deployment_tier,
+           adapter_status, official_source, source_checked_at)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
          on conflict (asset_id, chain_id) do update set
            chain_slug = excluded.chain_slug,
            chain_name = excluded.chain_name,
            contract_address = excluded.contract_address,
+           deployment_block = excluded.deployment_block,
+           deployment_block_source = excluded.deployment_block_source,
            deployment_tier = excluded.deployment_tier,
            adapter_status = excluded.adapter_status,
            official_source = excluded.official_source,
@@ -82,6 +85,8 @@ export async function syncParallelAssetRegistry(pool: Pool) {
           deployment.chainSlug,
           deployment.chainName,
           deployment.address.toLowerCase(),
+          deployment.deploymentBlock?.toString() ?? null,
+          deployment.deploymentBlockSource ?? null,
           deployment.tier,
           deployment.adapterStatus,
           parallelAssetRegistry.source,
