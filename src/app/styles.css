@@ -923,7 +923,7 @@ h1 span {
   font-size: 0.61rem;
   font-weight: 600;
   text-align: left;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.08em;
 }
 .chain-table td {
