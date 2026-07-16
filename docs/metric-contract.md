@@ -1,6 +1,11 @@
 # Metric contract
 
-Status: **cross-chain candidate**. HyperEVM is the first verified chain adapter; global metrics remain partial or unavailable until their required chain components pass coverage and reconciliation gates.
+Status: **reviewer-ready cross-chain candidate**. Current sUSDp state is complete
+across all five official savings deployments, the aligned seven-day native YPO
+is independently reconciled on all five chains, and deployment-to-goal holder
+and activity histories are complete on Ethereum, Base, Sonic, and Avalanche.
+The 24-chain USDp supply sum remains an accounting candidate until bridge
+topology and message reconciliation are complete.
 
 ## Asset and chain scopes
 
@@ -25,7 +30,7 @@ Status: **cross-chain candidate**. HyperEVM is the first verified chain adapter;
 | USDp issued/burned/redeemed     | USDp base units        | verified chain Parallelizer economic events           | Chain and aligned global sum                     |
 | USDp bridge inflow/outflow      | USDp base units        | verified bridge events                                | Chain; separate from issuer mint/burn            |
 | sUSDp deposit/withdraw/net flow | USDp base units        | chain ERC-4626 `Deposit`/`Withdraw`                   | Chain and aligned global sum                     |
-| Active holders                  | address count          | complete per-chain replay with cross-chain dedup rule | Unavailable until lifetime history is complete   |
+| Active holders                  | address count          | complete per-chain replay with cross-chain dedup rule | Complete on four lifetime-history chains         |
 
 ## Canonical native YPO
 
@@ -44,7 +49,10 @@ native_ypo_usdp =
   - pending_yield(start)
 ```
 
-The Phase 4 gate requires an independent rate-segment integration check before this metric can be displayed publicly.
+The public seven-day result is displayed only after the independent
+rate-segment integration check produces zero unexplained reconciliation delta
+for every aligned chain component. The current five-chain interval satisfies
+that gate.
 
 ## Non-applicable metrics
 

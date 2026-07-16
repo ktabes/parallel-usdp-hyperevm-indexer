@@ -59,9 +59,10 @@ Every headline metric has two independent axes:
 
 This prevents a present value from silently implying that its methodology is
 final. An unavailable value is `null` and includes a machine-readable reason.
-Current cross-chain savings values remain candidate until owner review. A
-historical global total is promoted to verified only after aligned, gap-free,
-per-chain coverage and reconciliation.
+The five-chain current savings snapshot remains candidate pending owner review;
+the aligned seven-day YPO is verified because all five component intervals are
+gap-free and independently reconciled. A historical global total is promoted
+to verified only after those coverage and reconciliation gates pass.
 
 ## Data flow and ownership
 
