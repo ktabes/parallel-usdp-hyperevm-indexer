@@ -102,28 +102,13 @@ export async function rebuildFlowAnalytics(
       ],
     );
 
-    for (const event of economicEvents) {
-      await database.query(
-        `insert into economic_events
-          (protocol_event_id, chain_id, block_number, transaction_hash,
-           log_index, classification, amount_base_units, asset_address,
-           primary_participant, secondary_participant, transaction_context,
-           source_from_block, source_to_block, manifest_version,
-           calculation_version)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15)
-         on conflict (protocol_event_id) do update set
-           classification = excluded.classification,
-           amount_base_units = excluded.amount_base_units,
-           asset_address = excluded.asset_address,
-           primary_participant = excluded.primary_participant,
-           secondary_participant = excluded.secondary_participant,
-           transaction_context = excluded.transaction_context,
-           source_from_block = excluded.source_from_block,
-           source_to_block = excluded.source_to_block,
-           manifest_version = excluded.manifest_version,
-           calculation_version = excluded.calculation_version,
-           created_at = now()`,
-        [
+    const batchSize = 500;
+    for (let offset = 0; offset < economicEvents.length; offset += batchSize) {
+      const batch = economicEvents.slice(offset, offset + batchSize);
+      const values: unknown[] = [];
+      const tuples = batch.map((event, index) => {
+        const base = index * 15;
+        values.push(
           event.id,
           event.chainId,
           event.blockNumber,
@@ -142,18 +127,39 @@ export async function rebuildFlowAnalytics(
           options.toBlock.toString(),
           manifestVersion,
           calculationVersion,
-        ],
+        );
+        return `(${Array.from({ length: 15 }, (_, position) => `$${base + position + 1}`).join(",")})`;
+      });
+      await database.query(
+        `insert into economic_events
+          (protocol_event_id, chain_id, block_number, transaction_hash,
+           log_index, classification, amount_base_units, asset_address,
+           primary_participant, secondary_participant, transaction_context,
+           source_from_block, source_to_block, manifest_version,
+           calculation_version)
+         values ${tuples.join(",")}
+         on conflict (protocol_event_id) do update set
+           classification = excluded.classification,
+           amount_base_units = excluded.amount_base_units,
+           asset_address = excluded.asset_address,
+           primary_participant = excluded.primary_participant,
+           secondary_participant = excluded.secondary_participant,
+           transaction_context = excluded.transaction_context,
+           source_from_block = excluded.source_from_block,
+           source_to_block = excluded.source_to_block,
+           manifest_version = excluded.manifest_version,
+           calculation_version = excluded.calculation_version,
+           created_at = now()`,
+        values,
       );
     }
 
-    for (const aggregate of aggregates) {
-      await database.query(
-        `insert into flow_aggregates
-          (chain_id, granularity, bucket_start, metric, amount_base_units,
-           event_count, unique_participants, source_from_block,
-           source_to_block, manifest_version, calculation_version)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-        [
+    for (let offset = 0; offset < aggregates.length; offset += batchSize) {
+      const batch = aggregates.slice(offset, offset + batchSize);
+      const values: unknown[] = [];
+      const tuples = batch.map((aggregate, index) => {
+        const base = index * 11;
+        values.push(
           chainId,
           aggregate.granularity,
           aggregate.bucketStart,
@@ -165,7 +171,16 @@ export async function rebuildFlowAnalytics(
           options.toBlock.toString(),
           manifestVersion,
           calculationVersion,
-        ],
+        );
+        return `(${Array.from({ length: 11 }, (_, position) => `$${base + position + 1}`).join(",")})`;
+      });
+      await database.query(
+        `insert into flow_aggregates
+          (chain_id, granularity, bucket_start, metric, amount_base_units,
+           event_count, unique_participants, source_from_block,
+           source_to_block, manifest_version, calculation_version)
+         values ${tuples.join(",")}`,
+        values,
       );
     }
     await database.query("commit");
