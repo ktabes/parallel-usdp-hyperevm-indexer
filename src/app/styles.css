@@ -575,12 +575,44 @@ h1 span {
   box-shadow: 0 0 12px var(--lime);
 }
 
+.metric-groups {
+  display: grid;
+  gap: 26px;
+}
+.metric-group {
+  display: grid;
+  gap: 12px;
+}
+.metric-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 4px;
+}
+.metric-group-heading h2,
+.metric-group-heading p {
+  margin: 0;
+}
+.metric-group-heading h2 {
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+.metric-group-heading p {
+  margin-top: 2px;
+  color: #747d75;
+  font-size: 0.68rem;
+}
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
   border: 1px solid var(--line);
   border-radius: 16px;
   overflow: hidden;
+}
+.metric-grid-usdp {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.metric-grid-susdp {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .metric-card {
   min-height: 144px;
@@ -606,12 +638,6 @@ h1 span {
 }
 .metric-card:last-child {
   border-right: 0;
-}
-.metric-card:nth-child(3n) {
-  border-right: 0;
-}
-.metric-card:nth-child(-n + 3) {
-  border-bottom: 1px solid var(--line);
 }
 .metric-card.featured {
   background:
@@ -1969,16 +1995,13 @@ footer > div:last-child {
     border-left: 0;
     border-radius: 24px 24px 0 0;
   }
-  .metric-grid {
+  .metric-grid-susdp {
     grid-template-columns: repeat(2, 1fr);
   }
-  .metric-card:nth-child(3n) {
-    border-right: 1px solid var(--line);
-  }
-  .metric-card:nth-child(2n) {
+  .metric-grid-susdp .metric-card:nth-child(2n) {
     border-right: 0;
   }
-  .metric-card:nth-child(-n + 4) {
+  .metric-grid-susdp .metric-card:nth-child(-n + 2) {
     border-bottom: 1px solid var(--line);
   }
   .asset-story-grid {
@@ -2078,17 +2101,15 @@ footer > div:last-child {
   .hero-side {
     justify-items: start;
   }
-  .metric-grid {
+  .metric-grid-usdp,
+  .metric-grid-susdp {
     grid-template-columns: 1fr;
   }
-  .metric-card {
+  .metric-grid .metric-card {
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
-  .metric-card:nth-child(3n) {
-    border-right: 0;
-  }
-  .metric-card:last-child {
+  .metric-grid .metric-card:last-child {
     border-bottom: 0;
   }
   .asset-story {

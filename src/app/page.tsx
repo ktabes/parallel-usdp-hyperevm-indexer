@@ -451,88 +451,116 @@ export default async function Home() {
           </div>
         </section>
 
-        <section
-          className="metric-grid"
-          id="overview"
-          aria-label="Asset overview"
-        >
-          <article className="metric-card usdp-metric">
-            <div className="metric-card-head">
-              <p>USDp price</p>
-              <span className="metric-glyph asset-glyph">
-                <AssetLogo asset="usdp" size={20} />
-              </span>
+        <div className="metric-groups" id="overview">
+          <section
+            className="metric-group"
+            aria-labelledby="usdp-overview-title"
+          >
+            <div className="metric-group-heading">
+              <AssetLogo asset="usdp" size={30} />
+              <div>
+                <h2 id="usdp-overview-title">USDp</h2>
+                <p>Stablecoin overview</p>
+              </div>
             </div>
-            <strong>{price(headline.usdpPriceUsd.value)}</strong>
-            <small>Market price · $1.00 target</small>
-          </article>
-          <article className="metric-card">
-            <div className="metric-card-head">
-              <p>Global USDp supply</p>
-              <span className="metric-glyph">Σ</span>
+            <div className="metric-grid metric-grid-usdp">
+              <article className="metric-card usdp-metric">
+                <div className="metric-card-head">
+                  <p>USDp price</p>
+                  <span className="metric-glyph asset-glyph">
+                    <AssetLogo asset="usdp" size={20} />
+                  </span>
+                </div>
+                <strong>{price(headline.usdpPriceUsd.value)}</strong>
+                <small>Market price · $1.00 target</small>
+              </article>
+              <article className="metric-card">
+                <div className="metric-card-head">
+                  <p>Global USDp supply</p>
+                  <span className="metric-glyph">Σ</span>
+                </div>
+                <strong>
+                  {globalSupplyAvailable
+                    ? `${decimal(globalSupplyValue, 18, 2)} USDp`
+                    : "Unavailable"}
+                </strong>
+                <small>
+                  {globalSupplyAvailable
+                    ? "Observed across all 24 USDp deployments"
+                    : "Latest 24-chain snapshot is incomplete"}
+                </small>
+              </article>
             </div>
-            <strong>
-              {globalSupplyAvailable
-                ? `${decimal(globalSupplyValue, 18, 2)} USDp`
-                : "Unavailable"}
-            </strong>
-            <small>
-              {globalSupplyAvailable
-                ? "Observed across all 24 USDp deployments"
-                : "Latest 24-chain snapshot is incomplete"}
-            </small>
-          </article>
-          <article className="metric-card">
-            <div className="metric-card-head">
-              <p>sUSDp TVL</p>
-              <span className="metric-glyph">▣</span>
+          </section>
+
+          <section
+            className="metric-group"
+            aria-labelledby="susdp-overview-title"
+          >
+            <div className="metric-group-heading">
+              <AssetLogo asset="susdp" size={30} />
+              <div>
+                <h2 id="susdp-overview-title">sUSDp</h2>
+                <p>Savings vault overview</p>
+              </div>
             </div>
-            <strong>
-              {headline.tvlUsdEstimate.value
-                ? `$${compact(headline.tvlUsdEstimate.value)}`
-                : `${compact(headline.tvlUsdp.value)} USDp`}
-            </strong>
-            <small>
-              {decimal(headline.tvlUsdp.value)} USDp deposited across five
-              chains
-            </small>
-          </article>
-          <article className="metric-card">
-            <div className="metric-card-head">
-              <p>sUSDp price</p>
-              <span className="metric-glyph asset-glyph">
-                <AssetLogo asset="susdp" size={20} />
-              </span>
+            <div className="metric-grid metric-grid-susdp">
+              <article className="metric-card">
+                <div className="metric-card-head">
+                  <p>sUSDp price</p>
+                  <span className="metric-glyph asset-glyph">
+                    <AssetLogo asset="susdp" size={20} />
+                  </span>
+                </div>
+                <strong>{price(headline.susdpMarketPriceUsd.value)}</strong>
+                <small>
+                  1 sUSDp = {decimal(portfolioSharePrice.toString(), 18, 4)}{" "}
+                  USDp in the vault
+                </small>
+              </article>
+              <article className="metric-card">
+                <div className="metric-card-head">
+                  <p>sUSDp TVL</p>
+                  <span className="metric-glyph">▣</span>
+                </div>
+                <strong>
+                  {headline.tvlUsdEstimate.value
+                    ? `$${compact(headline.tvlUsdEstimate.value)}`
+                    : `${compact(headline.tvlUsdp.value)} USDp`}
+                </strong>
+                <small>
+                  {decimal(headline.tvlUsdp.value)} USDp deposited across five
+                  chains
+                </small>
+              </article>
+              <article className="metric-card">
+                <div className="metric-card-head">
+                  <p>7-day Yield Paid Out</p>
+                  <span className="metric-glyph">↗</span>
+                </div>
+                <strong>
+                  {headline.ypoSevenDay.value
+                    ? `${decimal(headline.ypoSevenDay.value, 18, 4)} USDp`
+                    : `${verifiedHistory}/5 chains`}
+                </strong>
+                <small>Yield paid to sUSDp holders over the last 7 days</small>
+              </article>
+              <article className="metric-card">
+                <div className="metric-card-head">
+                  <p>Indexed all-time YPO</p>
+                  <span className="metric-glyph">∞</span>
+                </div>
+                <strong>
+                  {decimal(indexedAllTimeYpo.toString(), 18, 2)} USDp
+                </strong>
+                <small>
+                  Verified deployment histories on {lifetimeYieldRows.length}{" "}
+                  chains
+                </small>
+              </article>
             </div>
-            <strong>{price(headline.susdpMarketPriceUsd.value)}</strong>
-            <small>
-              1 sUSDp = {decimal(portfolioSharePrice.toString(), 18, 4)} USDp in
-              the vault
-            </small>
-          </article>
-          <article className="metric-card">
-            <div className="metric-card-head">
-              <p>7-day Yield Paid Out</p>
-              <span className="metric-glyph">↗</span>
-            </div>
-            <strong>
-              {headline.ypoSevenDay.value
-                ? `${decimal(headline.ypoSevenDay.value, 18, 4)} USDp`
-                : `${verifiedHistory}/5 chains`}
-            </strong>
-            <small>Yield paid to sUSDp holders over the last 7 days</small>
-          </article>
-          <article className="metric-card">
-            <div className="metric-card-head">
-              <p>Indexed all-time YPO</p>
-              <span className="metric-glyph">∞</span>
-            </div>
-            <strong>{decimal(indexedAllTimeYpo.toString(), 18, 2)} USDp</strong>
-            <small>
-              Verified deployment histories on {lifetimeYieldRows.length} chains
-            </small>
-          </article>
-        </section>
+          </section>
+        </div>
 
         <section className="asset-story" id="assets">
           <div className="section-heading">
