@@ -468,15 +468,18 @@ export default async function Home() {
           </article>
           <article className="metric-card">
             <div className="metric-card-head">
-              <p>sUSDp price</p>
-              <span className="metric-glyph asset-glyph">
-                <AssetLogo asset="susdp" size={20} />
-              </span>
+              <p>Global USDp supply</p>
+              <span className="metric-glyph">Σ</span>
             </div>
-            <strong>{price(headline.susdpMarketPriceUsd.value)}</strong>
+            <strong>
+              {globalSupplyAvailable
+                ? `${decimal(globalSupplyValue, 18, 2)} USDp`
+                : "Unavailable"}
+            </strong>
             <small>
-              1 sUSDp = {decimal(portfolioSharePrice.toString(), 18, 4)} USDp in
-              the vault
+              {globalSupplyAvailable
+                ? "Observed across all 24 USDp deployments"
+                : "Latest 24-chain snapshot is incomplete"}
             </small>
           </article>
           <article className="metric-card">
@@ -492,6 +495,19 @@ export default async function Home() {
             <small>
               {decimal(headline.tvlUsdp.value)} USDp deposited across five
               chains
+            </small>
+          </article>
+          <article className="metric-card">
+            <div className="metric-card-head">
+              <p>sUSDp price</p>
+              <span className="metric-glyph asset-glyph">
+                <AssetLogo asset="susdp" size={20} />
+              </span>
+            </div>
+            <strong>{price(headline.susdpMarketPriceUsd.value)}</strong>
+            <small>
+              1 sUSDp = {decimal(portfolioSharePrice.toString(), 18, 4)} USDp in
+              the vault
             </small>
           </article>
           <article className="metric-card">
@@ -514,22 +530,6 @@ export default async function Home() {
             <strong>{decimal(indexedAllTimeYpo.toString(), 18, 2)} USDp</strong>
             <small>
               Verified deployment histories on {lifetimeYieldRows.length} chains
-            </small>
-          </article>
-          <article className="metric-card">
-            <div className="metric-card-head">
-              <p>Global USDp supply</p>
-              <span className="metric-glyph">Σ</span>
-            </div>
-            <strong>
-              {globalSupplyAvailable
-                ? `${decimal(globalSupplyValue, 18, 2)} USDp`
-                : "Unavailable"}
-            </strong>
-            <small>
-              {globalSupplyAvailable
-                ? "Observed across all 24 USDp deployments"
-                : "Latest 24-chain snapshot is incomplete"}
             </small>
           </article>
         </section>
