@@ -457,7 +457,9 @@ export default async function Home() {
             aria-labelledby="usdp-overview-title"
           >
             <div className="metric-group-heading">
-              <AssetLogo asset="usdp" size={30} />
+              <span className="metric-group-logo">
+                <AssetLogo asset="usdp" size={30} />
+              </span>
               <div>
                 <h2 id="usdp-overview-title">USDp</h2>
                 <p>Stablecoin overview</p>
@@ -498,7 +500,9 @@ export default async function Home() {
             aria-labelledby="susdp-overview-title"
           >
             <div className="metric-group-heading">
-              <AssetLogo asset="susdp" size={30} />
+              <span className="metric-group-logo">
+                <AssetLogo asset="susdp" size={30} />
+              </span>
               <div>
                 <h2 id="susdp-overview-title">sUSDp</h2>
                 <p>Savings vault overview</p>

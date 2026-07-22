@@ -589,6 +589,14 @@ h1 span {
   gap: 11px;
   padding: 0 4px;
 }
+.metric-group-logo {
+  width: 30px;
+  height: 30px;
+  display: block;
+  flex: 0 0 30px;
+  overflow: hidden;
+  border-radius: 50%;
+}
 .metric-group-heading h2,
 .metric-group-heading p {
   margin: 0;
